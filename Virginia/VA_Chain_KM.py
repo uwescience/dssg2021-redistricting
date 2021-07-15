@@ -70,7 +70,7 @@ num_elections= 3
 
 #Make an output directory to dump files in
 
-newdir = os.path.join("Outputs", state_abbr+housen+"_Precincts")
+newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
 
 #!!!! WARNING: This code deletes folder without warning and even if there are files in it
@@ -466,7 +466,8 @@ for fpart in flip_chain:
                 writer.writerows(flip_votes[elect])
 
         df["plot" + str(t)] = df.index.map(dict(fpart.assignment))
-        df.plot(column="plot" + str(t), edgecolor="face", cmap="tab20")
+        df.plot(column="plot" + str(t), cmap="tab20") 
+        #edgecolor="face" if the lines go white (not sure why it randomly happens)
         plt.axis("off")
         plt.title(str(t) + " Steps")
         plt.savefig(newdir + "flip_plot" + str(t) + ".png")
@@ -477,11 +478,11 @@ for fpart in flip_chain:
         flip_egs = []
         flip_hmss = []
         flip_pop_vec = []
-        #cut_vec = []
+        #flip_cut_vec = []
 
 df["flip"] = df.index.map(dict(fpart.assignment))
 
-df.plot(column="flip",cmap='tab20', edgecolor="face", figsize=(12,8))
+df.plot(column="flip",cmap='tab20', figsize=(12,8)) #edgecolor="face" if the lines go white (not sure why it randomly happens)
 plt.axis("off")
 plt.title("Flip Proposal: 20,000 Steps")
 plt.show()
@@ -499,6 +500,16 @@ sns.set_style("darkgrid", {"axes.facecolor": ".97"})
 
 datadir = "./Outputs/VACON_Precincts/"
 
+#Build partitions for 2012/2016 maps to calculate comparison metrics
+
+partition_2012 = Partition(graph,
+                           df["CD_12"],
+                           updater)
+
+partition_2016 = Partition(graph,
+                           df["CD_16"],
+                           updater)
+    
 #--- RECOM PROPOSAL VISUALIZATION
 
 df_recom_seats = pd.DataFrame(recom_hmss,
@@ -518,9 +529,24 @@ plt.hist(df_recom_mms["G16PRS"])
 plt.title("ReCom: Mean-Median")
 plt.vlines(x=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]),
            ymin=0,
-           ymax=450,
+           ymax=(np.histogram(df_recom_mms["G16PRS"])[0]).max(), 
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.vlines(x=mean_median(partition_2012["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_recom_mms["G16PRS"])[0]).max(),
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.vlines(x=mean_median(partition_2016["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_recom_mms["G16PRS"])[0]).max(),
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 plt.plot(df_recom_mms["G16PRS"])
@@ -528,8 +554,23 @@ plt.title("ReCom: Mean-Median")
 plt.hlines(y=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]),
            xmin=0,
            xmax=2100,
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.hlines(y=mean_median(partition_2012["G16PRS"]),
+           xmin=0,
+           xmax=2100,
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.hlines(y=mean_median(partition_2016["G16PRS"]),
+           xmin=0,
+           xmax=2100,
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 #Efficiency Gap
@@ -538,9 +579,24 @@ plt.hist(df_recom_egs["G16PRS"])
 plt.title("ReCom: Efficiency Gap")
 plt.vlines(x=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]),
            ymin=0,
-           ymax=1200,
+           ymax=(np.histogram(df_recom_egs["G16PRS"])[0]).max(),
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.vlines(x=efficiency_gap(partition_2012["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_recom_egs["G16PRS"])[0]).max(),
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.vlines(x=efficiency_gap(partition_2016["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_recom_egs["G16PRS"])[0]).max(),
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 plt.plot(df_recom_egs["G16PRS"])
@@ -548,12 +604,24 @@ plt.title("ReCom: Efficiency Gap")
 plt.hlines(y=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]),
            xmin=0,
            xmax=2100,
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.hlines(y=efficiency_gap(partition_2012["G16PRS"]),
+           xmin=0,
+           xmax=2100,
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.hlines(y=efficiency_gap(partition_2016["G16PRS"]),
+           xmin=0,
+           xmax=2100,
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
-
-#TO DO: Calculate mean-median and efficiency gap using the 2012 and 2016 plans
-#sum(df["G16DPRS"].astype(float)), sum(df["G16RPRS"].astype(float))
 
 #--- FLIP PROPOSAL VISUALIZATION
 
@@ -602,9 +670,24 @@ plt.hist(df_flip_mms["G16PRS"])
 plt.title("Flip: Mean-Median")
 plt.vlines(x=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]),
            ymin=0,
-           ymax=3500,
+           ymax=(np.histogram(df_flip_mms["G16PRS"])[0]).max(),
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.vlines(x=mean_median(partition_2012["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_flip_mms["G16PRS"])[0]).max(),
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.vlines(x=mean_median(partition_2016["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_flip_mms["G16PRS"])[0]).max(),
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 plt.plot(df_flip_mms["G16PRS"])
@@ -612,8 +695,23 @@ plt.title("Flip: Mean-Median")
 plt.hlines(y=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]),
            xmin=0,
            xmax=20000,
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.hlines(y=mean_median(partition_2012["G16PRS"]),
+           xmin=0,
+           xmax=20000,
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.hlines(y=mean_median(partition_2016["G16PRS"]),
+           xmin=0,
+           xmax=20000,
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 #Efficiency Gap
@@ -622,9 +720,24 @@ plt.hist(df_flip_egs["G16PRS"])
 plt.title("Flip: Efficiency Gap")
 plt.vlines(x=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]),
            ymin=0,
-           ymax=20000,
+           ymax=(np.histogram(df_flip_egs["G16PRS"])[0]).max(),
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.vlines(x=efficiency_gap(partition_2012["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_flip_egs["G16PRS"])[0]).max(),
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.vlines(x=efficiency_gap(partition_2016["G16PRS"]),
+           ymin=0,
+           ymax=(np.histogram(df_flip_egs["G16PRS"])[0]).max(),
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
 
 plt.plot(df_flip_egs["G16PRS"])
@@ -632,6 +745,22 @@ plt.title("Flip: Efficiency Gap")
 plt.hlines(y=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]),
            xmin=0,
            xmax=20000,
+           colors="blue",
+           linestyles="solid",
+           label="Ensemble Mean")
+plt.hlines(y=efficiency_gap(partition_2012["G16PRS"]),
+           xmin=0,
+           xmax=20000,
            colors="red",
-           linestyles="solid")
+           linestyles="dashed",
+           label="2012 Plan")
+plt.hlines(y=efficiency_gap(partition_2016["G16PRS"]),
+           xmin=0,
+           xmax=20000,
+           colors="orange",
+           linestyles="dashed",
+           label="2016 Plan")
+plt.legend(bbox_to_anchor=(.8, 1), 
+           loc='upper left', borderaxespad=0.)
 plt.show()
+
