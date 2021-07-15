@@ -37,8 +37,14 @@ from gerrychain.updaters import cut_edges
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
 #--- IMPORT DATA
-
-#os.chdir("/Volumes/GoogleDrive/My Drive/2021/DSSG/github/Virginia/")
+try:
+    os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
+                          "Virginia"))
+except OSError:
+    os.mkdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
+                          "Virginia"))
+    os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
+                          "Virginia"))
 
 graph = Graph.from_json("VA_Chain.json")
 df = gpd.read_file("VA_precincts.shp")
@@ -64,7 +70,7 @@ num_elections= 3
 
 #Make an output directory to dump files in
 
-newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
+newdir = os.path.join("Outputs", state_abbr+housen+"_Precincts")
 print(newdir)
 
 #!!!! WARNING: This code deletes folder without warning and even if there are files in it
