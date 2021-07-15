@@ -7,7 +7,7 @@ Virginia Case Study
 
 #--- IMPORT LIBRARIES
 
-import os 
+import os
 
 import csv
 import json
@@ -33,15 +33,15 @@ from gerrychain import (
 )
 from gerrychain.metrics import efficiency_gap, mean_median, polsby_popper, wasted_votes
 from gerrychain.proposals import recom, propose_random_flip
-from gerrychain.updaters import cut_edges 
+from gerrychain.updaters import cut_edges
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
 #--- IMPORT DATA
 
-os.chdir("/Volumes/GoogleDrive/My Drive/2021/DSSG/code")
+#os.chdir("/Volumes/GoogleDrive/My Drive/2021/DSSG/github/Virginia/")
 
-graph = Graph.from_json("./DSSG_Data/VA_Chain.json")
-df = gpd.read_file("./DSSG_Data/VA_precincts.shp")
+graph = Graph.from_json("VA_Chain.json")
+df = gpd.read_file("VA_precincts.shp")
 
 #Eyeball the state
 df.plot(column="CD_12", cmap="tab20", figsize=(12,8))
@@ -68,10 +68,10 @@ newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
 
 #!!!! WARNING: This code deletes folder without warning and even if there are files in it
-#!!!! CHECK newdir BEFORE RUNNING! 
+#!!!! CHECK newdir BEFORE RUNNING!
 #import shutil
 #shutil.rmtree(os.path.dirname(newdir)) #WARNING
-#!!!! CHECK newdir BEFORE RUNNING! 
+#!!!! CHECK newdir BEFORE RUNNING!
 
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 #with open(newdir + "init.txt", "w") as f:
@@ -82,7 +82,7 @@ os.makedirs(os.path.dirname(newdir), exist_ok=True)
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), #can only take in partitions
     "cut_edges": cut_edges,
-    "PP":polsby_popper 
+    "PP":polsby_popper
             }
 
 #--- ELECTION UPDATERS
@@ -122,7 +122,7 @@ updater.update(election_updaters)
 
 #--- DATA CLEANING
 
-totpop = 0 
+totpop = 0
 for n in graph.nodes():
     totpop+= graph.nodes[n]["TOTPOP"]
     graph.nodes[n]["G18DSEN"] = int(float(graph.nodes[n]["G18DSEN"]))
@@ -149,7 +149,7 @@ plt.show()
 
 #--- PARTITION
 
-initial_partition = Partition(graph, 
+initial_partition = Partition(graph,
                               cddict, #initial plan (this is our recurisive_tree_part)
                               updater)
 
@@ -175,17 +175,17 @@ stats_df = pd.DataFrame(index=["d1_pct",
                                "efficiency_gap",
                                "seat_num",
                                #"cut_edges"
-                               ], 
+                               ],
                         columns=election_names)
 
 for i in range(3):
     current_column = stats_df.columns[i]
     dist_i = initial_partition[election_names[i]].percents("First")
-    stats_df[current_column] = [float(dist_i[0]), 
-                                float(dist_i[1]), 
-                                float(dist_i[2]), 
-                                float(dist_i[3]), 
-                                float(dist_i[4]), 
+    stats_df[current_column] = [float(dist_i[0]),
+                                float(dist_i[1]),
+                                float(dist_i[2]),
+                                float(dist_i[3]),
+                                float(dist_i[4]),
                                 float(dist_i[5]),
                                 float(dist_i[6]),
                                 float(dist_i[7]),
@@ -258,11 +258,11 @@ with open(newdir + "Start_Values.txt", "w") as f:
 
 proposal = partial(#All the functions inside gerrychain want to take partition, but recom wants more functions than that
                    #Partial takes main functions and prefill all the objects until it becomes a partition
-    recom,  
-    pop_col="TOTPOP", 
-    pop_target=ideal_population, 
-    epsilon=0.05, 
-    node_repeats=1, 
+    recom,
+    pop_col="TOTPOP",
+    pop_target=ideal_population,
+    epsilon=0.05,
+    node_repeats=1,
     method = bipartition_tree_random
 )
 
@@ -274,55 +274,54 @@ compactness_bound = constraints.UpperBound(
 
 #--- ACCEPTANCE FUNCTIONS
 
-def sixty_accept(partition): 
-#competitiveness comparison between old and new chains   
-#how many of these districts have percentages under 60%    
+"""
+def sixty_accept(partition):
+#competitiveness comparison between old and new chains
+#how many of these districts have percentages under 60%
     new = sum(x<.6 for x in partition["G18SEN"].percents("First"))
     #Looking at each district and if the votes are less than 60% and summing all districts
-    
-    old = sum(x<.6 for x in partition.parent["G18SEN"].percents("First")) 
+
+    old = sum(x<.6 for x in partition.parent["G18SEN"].percents("First"))
     #Parition parent provides us access to parent and evaluate in comparison to the next step
-    
+
     if new > old:  #Newer chain have fewer districts not meeting the 60% than old chain
         return True
-    
+
     else:
         return False
-    
-"""
-    
-def unpack_accept(part): 
+
+def unpack_accept(part):
     if max(part["PRES16"].percents("D")) < .65:
         return True
-    
+
     elif max(part["PRES16"].percents("D")) < max(part.parent["PRES16"].percents("D")):
         return True
-    
+
     elif random.random() < max(part.parent["PRES16"].percents("D"))/max(part["PRES16"].percents("D")):
         return True
     else:
         return False
-   
-""" 
+
+"""
 #--- MCMC CHAINS
 
 recom_chain = MarkovChain( #recom automatically does contiguity
     proposal=proposal,
     constraints=[
         constraints.within_percent_of_ideal_population(initial_partition, 0.05),
-        compactness_bound, 
+        compactness_bound,
     ],
     accept=accept.always_accept, #put acceptance function later?
     initial_state=initial_partition,
-    total_steps=2000 
+    total_steps=2000
 )
 
 flip_chain = MarkovChain(
     proposal=propose_random_flip,
     constraints=[
         constraints.within_percent_of_ideal_population(initial_partition, 0.05),
-        constraints.single_flip_contiguous, 
-        compactness_bound 
+        constraints.single_flip_contiguous,
+        compactness_bound
     ],
     accept=accept.always_accept,
     initial_state=initial_partition,
@@ -331,8 +330,8 @@ flip_chain = MarkovChain(
 
 """
 mix_chain = MarkovChain(
-    proposal= #check out how to build mix 
-    constraints=[ #constraints for mix 
+    proposal= #check out how to build mix
+    constraints=[ #constraints for mix
     ],
     accept=accept.always_accept,
     initial_state=initial_partition,
@@ -347,7 +346,7 @@ mix_chain = MarkovChain(
 sixty = []
 
 for part in recom_chain:
-    
+
     sixty.append(sum(x<.6 for x in part["G18SEN"].percents("First"))) #
 
 plt.plot(sixty) #number of competitive districts below 60%
@@ -360,7 +359,7 @@ recom_cut_vec = [] #cut edges
 recom_votes = [[], [], [], [],[],[]] #number of votes
 recom_mms = [] #mean-median score
 recom_egs = [] #efficiency gap score
-recom_hmss = [] #how many seats score 
+recom_hmss = [] #how many seats score
 
 t = 0 #keep track on how long we make it in the chain
 
@@ -382,14 +381,14 @@ for repart in recom_chain:
     if t % 200 == 0:
         #sorted by score and by column aligned with the election_columns
         print(t)
-        
+
         df["plot" + str(t)] = df.index.map(dict(repart.assignment))
         df.plot(column="plot" + str(t), cmap="tab20", edgecolor="face")
         plt.axis("off")
         plt.title(str(t) + " Steps")
         plt.savefig(newdir + "recom_plot" + str(t) + ".png")
         plt.close()
-        
+
 df["recom"] = df.index.map(dict(repart.assignment))
 
 df.plot(column="recom",cmap='tab20', figsize=(12,8))
@@ -404,9 +403,9 @@ flip_cut_vec = [] #cut edges
 flip_votes = [[], [], [], [],[],[]] #number of votes
 flip_mms = [] #mean-median score
 flip_egs = [] #efficiency gap score
-flip_hmss = [] #how many seats score 
+flip_hmss = [] #how many seats score
 
-t = 0 
+t = 0
 
 for fpart in flip_chain:
 
@@ -427,9 +426,9 @@ for fpart in flip_chain:
     t += 1
 
     if t % 2000 == 0:
-        
+
         print(t)
-        
+
         with open(newdir + "flip_mms" + str(t) + ".csv", "w") as tf1:
             writer = csv.writer(tf1, lineterminator="\n")
             writer.writerows(flip_mms) #want to see ~0.015 for something reasonable
@@ -449,7 +448,7 @@ for fpart in flip_chain:
         #with open(newdir + "flip_cuts" + str(t) + ".csv", "w") as tf1:
         #    writer = csv.writer(tf1, lineterminator="\n")
         #    writer.writerows(flip_cut_vec)
-            
+
         with open(newdir + "flip_assignment" + str(t) + ".json", "w") as jf1:
             json.dump(dict(fpart.assignment), jf1)
 
@@ -473,7 +472,7 @@ for fpart in flip_chain:
         hmss = []
         pop_vec = []
         #cut_vec = []
-        
+
 df["flip"] = df.index.map(dict(fpart.assignment))
 
 df.plot(column="flip",cmap='tab20', figsize=(12,8))
@@ -494,24 +493,24 @@ sns.set_style("darkgrid", {"axes.facecolor": ".97"})
 
 datadir = "./Outputs/VACON_Precincts/"
 
-#--- RECOM PROPOSAL VISUALIZATION 
+#--- RECOM PROPOSAL VISUALIZATION
 
-df_recom_seats = pd.DataFrame(recom_hmss, 
+df_recom_seats = pd.DataFrame(recom_hmss,
                     columns=election_names)
 
 df_recom_cuts = pd.DataFrame(recom_cut_vec)
 
-df_recom_mms = pd.DataFrame(recom_mms, 
+df_recom_mms = pd.DataFrame(recom_mms,
                     columns=election_names)
 
-df_recom_egs = pd.DataFrame(recom_egs, 
+df_recom_egs = pd.DataFrame(recom_egs,
                     columns=election_names)
 
 #Mean-Median
 
 plt.hist(df_recom_mms["G16PRS"])
 plt.title("ReCom: Mean-Median")
-plt.vlines(x=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]), 
+plt.vlines(x=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]),
            ymin=0,
            ymax=450,
            colors="red",
@@ -520,10 +519,10 @@ plt.show()
 
 plt.plot(df_recom_mms["G16PRS"])
 plt.title("ReCom: Mean-Median")
-plt.hlines(y=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]), 
+plt.hlines(y=sum(df_recom_mms["G16PRS"])/len(df_recom_mms["G16PRS"]),
            xmin=0,
            xmax=2100,
-           colors="red", 
+           colors="red",
            linestyles="solid")
 plt.show()
 
@@ -531,7 +530,7 @@ plt.show()
 
 plt.hist(df_recom_egs["G16PRS"])
 plt.title("ReCom: Efficiency Gap")
-plt.vlines(x=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]), 
+plt.vlines(x=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]),
            ymin=0,
            ymax=1200,
            colors="red",
@@ -540,20 +539,20 @@ plt.show()
 
 plt.plot(df_recom_egs["G16PRS"])
 plt.title("ReCom: Efficiency Gap")
-plt.hlines(y=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]), 
+plt.hlines(y=sum(df_recom_egs["G16PRS"])/len(df_recom_egs["G16PRS"]),
            xmin=0,
            xmax=2100,
-           colors="red", 
+           colors="red",
            linestyles="solid")
 plt.show()
 
 #TO DO: Calculate mean-median and efficiency gap using the 2012 and 2016 plans
 #sum(df["G16DPRS"].astype(float)), sum(df["G16RPRS"].astype(float))
 
-#--- FLIP PROPOSAL VISUALIZATION 
+#--- FLIP PROPOSAL VISUALIZATION
 
-max_steps = 20000 
-step_size = 2000 
+max_steps = 20000
+step_size = 2000
 
 ts = [x * step_size for x in range(1, int(max_steps / step_size) + 1)]
 #[2000, 4000, 6000, 8000, 10000... 20000]
@@ -563,7 +562,7 @@ flip_mms = []
 flip_egs = []
 #flip_cut_vec=[]
 
-for t in ts:  
+for t in ts:
     temp = np.loadtxt(datadir + "flip_hmss" + str(t) + ".csv", delimiter=",")
     for s in range(step_size):
         flip_seats.append(temp[s, :])
@@ -575,27 +574,27 @@ for t in ts:
     temp = np.loadtxt(datadir + "flip_egs" + str(t) + ".csv", delimiter=",")
     for s in range(step_size):
         flip_egs.append(temp[s, :])
-        
+
     #temp_c = np.loadtxt(datadir + "flip_cuts" + str(t) + ".csv", delimiter=",")
     #temp_c = temp_c.transpose()
     #for s in range(step_size):
     #    flip_cut_vec.append(temp_c[s])
 
 
-df_flip_seats = pd.DataFrame(flip_seats, 
+df_flip_seats = pd.DataFrame(flip_seats,
                     columns=election_names)
 
-df_flip_mms = pd.DataFrame(flip_mms, 
+df_flip_mms = pd.DataFrame(flip_mms,
                     columns=election_names)
 
-df_flip_egs = pd.DataFrame(flip_egs, 
+df_flip_egs = pd.DataFrame(flip_egs,
                     columns=election_names)
 
 #Mean-Median
 
 plt.hist(df_flip_mms["G16PRS"])
 plt.title("Flip: Mean-Median")
-plt.vlines(x=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]), 
+plt.vlines(x=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]),
            ymin=0,
            ymax=3500,
            colors="red",
@@ -604,10 +603,10 @@ plt.show()
 
 plt.plot(df_flip_mms["G16PRS"])
 plt.title("Flip: Mean-Median")
-plt.hlines(y=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]), 
+plt.hlines(y=sum(df_flip_mms["G16PRS"])/len(df_flip_mms["G16PRS"]),
            xmin=0,
            xmax=20000,
-           colors="red", 
+           colors="red",
            linestyles="solid")
 plt.show()
 
@@ -615,7 +614,7 @@ plt.show()
 
 plt.hist(df_flip_egs["G16PRS"])
 plt.title("Flip: Efficiency Gap")
-plt.vlines(x=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]), 
+plt.vlines(x=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]),
            ymin=0,
            ymax=20000,
            colors="red",
@@ -624,14 +623,9 @@ plt.show()
 
 plt.plot(df_flip_egs["G16PRS"])
 plt.title("Flip: Efficiency Gap")
-plt.hlines(y=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]), 
+plt.hlines(y=sum(df_flip_egs["G16PRS"])/len(df_flip_egs["G16PRS"]),
            xmin=0,
            xmax=20000,
-           colors="red", 
+           colors="red",
            linestyles="solid")
 plt.show()
-
-
-
-
-
