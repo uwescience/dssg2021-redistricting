@@ -206,8 +206,8 @@ stats_inital_df.plot(y=['d1_pct','d2_pct','d3_pct','d4_pct','d5_pct','d6_pct',
                         'd7_pct','d8_pct','d9_pct','d10_pct','d11_pct']
                      )
 
-stats_inital_df.plot(y=['mean_median','efficiency_gap']
-                     )
+
+
 """
 with open(newdir + "Start_Values.txt", "w") as f:
     f.write("Values for Starting Plan: Tree Recursive\n \n ")
@@ -379,11 +379,11 @@ for repart in recom_chain:
 
     t += 1
     if t % 200 == 0:
-        #sorted by score and by column aligned with the election_columns
+
         print(t)
 
         df["plot" + str(t)] = df.index.map(dict(repart.assignment))
-        df.plot(column="plot" + str(t), cmap="tab20", edgecolor="face")
+        df.plot(column="plot" + str(t), cmap="tab20")
         plt.axis("off")
         plt.title(str(t) + " Steps")
         plt.savefig(newdir + "recom_plot" + str(t) + ".png")
@@ -460,22 +460,22 @@ for fpart in flip_chain:
                 writer.writerows(flip_votes[elect])
 
         df["plot" + str(t)] = df.index.map(dict(fpart.assignment))
-        df.plot(column="plot" + str(t), cmap="tab20")
+        df.plot(column="plot" + str(t), edgecolor="face", cmap="tab20")
         plt.axis("off")
         plt.title(str(t) + " Steps")
         plt.savefig(newdir + "flip_plot" + str(t) + ".png")
         plt.close()
 
-        votes = [[], [], [], [],[],[]]
-        mms = []
-        egs = []
-        hmss = []
-        pop_vec = []
+        flip_votes =  [[], [], [], [],[],[]]
+        flip_mms = []
+        flip_egs = []
+        flip_hmss = []
+        flip_pop_vec = []
         #cut_vec = []
 
 df["flip"] = df.index.map(dict(fpart.assignment))
 
-df.plot(column="flip",cmap='tab20', figsize=(12,8))
+df.plot(column="flip",cmap='tab20', edgecolor="face", figsize=(12,8))
 plt.axis("off")
 plt.title("Flip Proposal: 20,000 Steps")
 plt.show()
