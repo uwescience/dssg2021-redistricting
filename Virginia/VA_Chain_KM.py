@@ -5,13 +5,14 @@ Virginia Case Study
 
 """
 
-#--- IMPORT LIBRARIES
-
 import os
+import sys
 
 import csv
 import json
 import random
+import math
+import numpy as np
 
 from functools import partial
 import pandas as pd
@@ -19,8 +20,7 @@ import geopandas as gpd
 
 import matplotlib
 import matplotlib.pyplot as plt
-#import matplotlib.style as style
-#style.use('dark_background')
+import seaborn as sns
 
 from gerrychain import (
     Election,
@@ -36,6 +36,9 @@ from gerrychain.proposals import recom, propose_random_flip
 from gerrychain.updaters import cut_edges
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
+sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
+from utility_functions import plot_district_map, add_other_population_attribute, convert_attributes_to_int
+
 #--- IMPORT DATA
 try:
     os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
@@ -46,19 +49,8 @@ except OSError:
     os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
                           "Virginia"))
 
-graph = Graph.from_json("VA_Chain.json")
-df = gpd.read_file("VA_precincts.shp")
-
-#Eyeball the state
-df.plot(column="CD_12", cmap="tab20", figsize=(12,8))
-plt.axis("off")
-plt.title("2012 Congressional District Map")
-plt.show()
-
-df.plot(column="CD_16", cmap="tab20", figsize=(12,8))
-plt.axis("off")
-plt.title("2016 Congressional District Map")
-plt.show()
+graph = Graph.from_json("data/VA_Chain.json")
+df = gpd.read_file("data/VA_precincts.shp")
 
 #--- CREATE SHORTCUTS
 
@@ -69,19 +61,20 @@ pop_col="TOTPOP"
 num_elections= 3
 
 #Make an output directory to dump files in
-
 newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
-
-#!!!! WARNING: This code deletes folder without warning and even if there are files in it
-#!!!! CHECK newdir BEFORE RUNNING!
-#import shutil
-#shutil.rmtree(os.path.dirname(newdir)) #WARNING
-#!!!! CHECK newdir BEFORE RUNNING!
-
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
-#with open(newdir + "init.txt", "w") as f:
-#    f.write("Created Folder")
+
+# Visualize districts for existing plans
+plot_district_map(df, "CD_12", "2012 Congressional District Map")
+plot_district_map(df, "CD_16", "2016 Congressional District Map")
+
+
+#--- DATA CLEANING
+graph = convert_attributes_to_int(graph, ["G18DSEN", "G18RSEN", "G16DPRS", "G16RPRS"])
+
+# calculate non-BVAP
+graph = add_other_population_attribute(graph)
 
 #--- GENERIC UPDATERS
 
@@ -119,25 +112,14 @@ elections = [
     for i in range(num_elections)
 ]
 
-for node in graph.nodes():
-    graph.nodes[node]["nBVAP"] = graph.nodes[node]["VAP"] - graph.nodes[node]["BVAP"]
 
 election_updaters = {election.name: election for election in elections}
-
 updater.update(election_updaters)
 
-#--- DATA CLEANING
-
-totpop = 0
-for n in graph.nodes():
-    totpop+= graph.nodes[n]["TOTPOP"]
-    graph.nodes[n]["G18DSEN"] = int(float(graph.nodes[n]["G18DSEN"]))
-    graph.nodes[n]["G18RSEN"] = int(float(graph.nodes[n]["G18RSEN"]))
-    graph.nodes[n]["G16DPRS"] = int(float(graph.nodes[n]["G16DPRS"]))
-    graph.nodes[n]["G16RPRS"] = int(float(graph.nodes[n]["G16RPRS"]))
 
 #--- STARTING PLAN (SEED PLAN)
 
+totpop = df.TOTPOP.sum()
 cddict =  recursive_tree_part(graph, #graph object
                               range(num_districts), #How many districts
                               totpop/num_districts, #population target
@@ -146,14 +128,12 @@ cddict =  recursive_tree_part(graph, #graph object
                               1)
 
 df['initial'] = df.index.map(cddict)
+file_name = os.path.join(newdir, "initial_plan.png")
+plot_district_map(df, "initial", "Seed Plan: Recursive Partitioning Tree",
+                  output_path=file_name)
 
-df.plot(column="initial",cmap="tab20", figsize=(12,8))
-plt.axis("off")
-plt.title("Seed Plan: Recursive Partitioning Tree")
-plt.show()
-#plt.savefig(newdir+"initial.png")
 
-#--- PARTITION
+# --- PARTITION
 
 initial_partition = Partition(graph,
                               cddict, #initial plan (this is our recurisive_tree_part)
@@ -214,53 +194,8 @@ stats_inital_df.plot(y=['d1_pct','d2_pct','d3_pct','d4_pct','d5_pct','d6_pct',
 
 
 
-"""
-with open(newdir + "Start_Values.txt", "w") as f:
-    f.write("Values for Starting Plan: Tree Recursive\n \n ")
-    f.write("Initial Cut: " + str(len(initial_partition["cut_edges"])))
-    f.write("\n")
-    f.write("\n")
 
-    for elect in range(num_elections):
-        f.write(
-            election_names[elect]
-            + "_District Percentages"
-            + str(
-                sorted(initial_partition[election_names[elect]].percents("First"))
-            )
-        )
-        f.write("\n")
-        f.write("\n")
-
-        f.write(
-            election_names[elect]
-            + "_Mean-Median :"
-            + str(mean_median(initial_partition[election_names[elect]]))
-        )
-
-        f.write("\n")
-        f.write("\n")
-
-        f.write(
-            election_names[elect]
-            + "_Efficiency Gap :"
-            + str(efficiency_gap(initial_partition[election_names[elect]]))
-        )
-
-        f.write("\n")
-        f.write("\n")
-
-        f.write(
-            election_names[elect]
-            + "_How Many Seats :"
-            + str(initial_partition[election_names[elect]].wins("First"))
-        )
-
-        f.write("\n")
-        f.write("\n")
-"""
-
-#--- PROPOSAL
+# --- PROPOSAL
 
 proposal = partial(#All the functions inside gerrychain want to take partition, but recom wants more functions than that
                    #Partial takes main functions and prefill all the objects until it becomes a partition
@@ -280,35 +215,7 @@ compactness_bound = constraints.UpperBound(
 
 #--- ACCEPTANCE FUNCTIONS
 
-"""
-def sixty_accept(partition):
-#competitiveness comparison between old and new chains
-#how many of these districts have percentages under 60%
-    new = sum(x<.6 for x in partition["G18SEN"].percents("First"))
-    #Looking at each district and if the votes are less than 60% and summing all districts
 
-    old = sum(x<.6 for x in partition.parent["G18SEN"].percents("First"))
-    #Parition parent provides us access to parent and evaluate in comparison to the next step
-
-    if new > old:  #Newer chain have fewer districts not meeting the 60% than old chain
-        return True
-
-    else:
-        return False
-
-def unpack_accept(part):
-    if max(part["PRES16"].percents("D")) < .65:
-        return True
-
-    elif max(part["PRES16"].percents("D")) < max(part.parent["PRES16"].percents("D")):
-        return True
-
-    elif random.random() < max(part.parent["PRES16"].percents("D"))/max(part["PRES16"].percents("D")):
-        return True
-    else:
-        return False
-
-"""
 #--- MCMC CHAINS
 
 recom_chain = MarkovChain( #recom automatically does contiguity
@@ -334,32 +241,10 @@ flip_chain = MarkovChain(
     total_steps=20000
 )
 
-"""
-mix_chain = MarkovChain(
-    proposal= #check out how to build mix
-    constraints=[ #constraints for mix
-    ],
-    accept=accept.always_accept,
-    initial_state=initial_partition,
-    total_steps= #ideal num of steps?
-)
-"""
+
 
 #--- RUN RECOMBINATION PROPOSAL
 
-"""
-#Testing whether 60% acceptance function is feasible
-sixty = []
-
-for part in recom_chain:
-
-    sixty.append(sum(x<.6 for x in part["G18SEN"].percents("First"))) #
-
-plt.plot(sixty) #number of competitive districts below 60%
-
-df['recom'] = df.index.map(dict(part.assignment)) #new plan
-df.plot(column="recom",cmap='tab20')
-"""
 recom_pop_vec = [] #total population
 recom_cut_vec = [] #cut edges
 recom_votes = [[], [], [], [],[],[]] #number of votes
@@ -387,20 +272,15 @@ for repart in recom_chain:
     if t % 200 == 0:
 
         print(t)
-
-        df["plot" + str(t)] = df.index.map(dict(repart.assignment))
-        df.plot(column="plot" + str(t), cmap="tab20")
-        plt.axis("off")
-        plt.title(str(t) + " Steps")
-        plt.savefig(newdir + "recom_plot" + str(t) + ".png")
-        plt.close()
+        df[str(t)] = df.index.map(dict(repart.assignment))
+        filename ="recom_plot" + str(t) + ".png"
+        plot_district_map(df, str(t),
+                          title=str(t) + " Steps",
+                          output_path=os.path.join(newdir, filename)
+                          )
 
 df["recom"] = df.index.map(dict(repart.assignment))
 
-df.plot(column="recom",cmap='tab20', figsize=(12,8))
-plt.axis("off")
-plt.title("ReCom Proposal: 2,000 Steps")
-plt.show()
 
 #--- RUN FLIP BOUNDARY PROPOSAL
 
@@ -466,7 +346,7 @@ for fpart in flip_chain:
                 writer.writerows(flip_votes[elect])
 
         df["plot" + str(t)] = df.index.map(dict(fpart.assignment))
-        df.plot(column="plot" + str(t), cmap="tab20") 
+        df.plot(column="plot" + str(t), cmap="tab20")
         #edgecolor="face" if the lines go white (not sure why it randomly happens)
         plt.axis("off")
         plt.title(str(t) + " Steps")
@@ -488,12 +368,6 @@ plt.title("Flip Proposal: 20,000 Steps")
 plt.show()
 
 #--- BUILD VISUALIZATIONS
-
-#import os
-import math
-#import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 
 # sns.set_style('darkgrid')
 sns.set_style("darkgrid", {"axes.facecolor": ".97"})
@@ -533,7 +407,7 @@ def comparison_hist(df_proposal_metric, title, election, gc_metric):
                colors="orange",
                linestyles="dashed",
                label="2016 Plan")
-    plt.legend(bbox_to_anchor=(.8, 1), 
+    plt.legend(bbox_to_anchor=(.8, 1),
                loc='upper left', borderaxespad=0.)
     plt.show()
 
@@ -558,10 +432,10 @@ def comparison_plot(df_proposal_metric, title, election, gc_metric):
            colors="orange",
            linestyles="dashed",
            label="2016 Plan")
-    plt.legend(bbox_to_anchor=(.8, 1), 
+    plt.legend(bbox_to_anchor=(.8, 1),
            loc='upper left', borderaxespad=0.)
     plt.show()
-    
+
 #--- RECOM PROPOSAL VISUALIZATION
 
 df_recom_seats = pd.DataFrame(recom_hmss,
@@ -577,8 +451,8 @@ df_recom_egs = pd.DataFrame(recom_egs,
 
 #Mean-Median
 
-comparison_hist(df_recom_mms["G16PRS"], 
-                "ReCom: Mean-Median", 
+comparison_hist(df_recom_mms["G16PRS"],
+                "ReCom: Mean-Median",
                 "G16PRS",
                 mean_median)
 
@@ -589,7 +463,7 @@ comparison_plot(df_recom_mms["G16PRS"],
 
 #Efficiency Gap
 
-comparison_hist(df_recom_egs["G16PRS"], 
+comparison_hist(df_recom_egs["G16PRS"],
                 "ReCom: Efficiency Gap",
                 "G16PRS",
                 efficiency_gap)
@@ -641,8 +515,8 @@ df_flip_egs = pd.DataFrame(flip_egs,
 
 #Mean-Median
 
-comparison_hist(df_flip_mms["G16PRS"], 
-                "Flip: Mean-Median", 
+comparison_hist(df_flip_mms["G16PRS"],
+                "Flip: Mean-Median",
                 "G16PRS",
                 mean_median)
 
@@ -653,7 +527,7 @@ comparison_plot(df_flip_mms["G16PRS"],
 
 #Efficiency Gap
 
-comparison_hist(df_flip_egs["G16PRS"], 
+comparison_hist(df_flip_egs["G16PRS"],
                 "Flip: Efficiency Gap",
                 "G16PRS",
                 efficiency_gap)
