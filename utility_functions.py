@@ -7,6 +7,7 @@ import geopandas as gpd
 
 import matplotlib
 import matplotlib.pyplot as plt
+from functools import reduce
 
 
 def plot_district_map(df, label_column, title=None, output_path=None):
@@ -24,17 +25,25 @@ def plot_district_map(df, label_column, title=None, output_path=None):
         plt.show()
 
 
-def add_other_population_attribute(graph, total_column="VAP",
-                                   target_population_column="BVAP",
+def add_other_population_attribute(graph, total_column_list=["VAP"],
+                                   target_population_column_list=["BVAP"],
                                    other_population_name="nBVAP"):
-    """calculates other population value by finding difference between total
+    """
+     calculates other population value by finding difference between total
      population and target population. For example, return graph with
      non-BVAP attribute using VAP & BVAP values
+
+    :param graph: networkx graph object
+    :param total_column_list: list of all attributes to consider in the 'total population' (e.g. VAP)
+    :param target_population_column_list: list of all attributes to consider in the 'target population' (e.g. BVAP)
+    :param other_population_name: string - identifer for other population
+    :return:
     """
 
     for node in graph.nodes():
-        graph.nodes[node][other_population_name] = graph.nodes[node][total_column] - \
-                                                   graph.nodes[node][target_population_column]
+        total_sum = reduce(lambda a, b: a+b, [graph.nodes[node][att] for att in total_column_list])
+        target_sum = reduce(lambda a, b: a+b, [graph.nodes[node][att] for att in target_population_column_list])
+        graph.nodes[node][other_population_name] = total_sum - target_sum
 
     return graph
 
@@ -56,3 +65,4 @@ def convert_attributes_to_float(graph, attribute_list):
         for attribute in attribute_list:
             graph.nodes[n][attribute] = float(graph.nodes[n][attribute])
     return graph
+
