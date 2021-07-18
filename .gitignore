@@ -1,5 +1,7 @@
 # Ignore output folders in each state folder
 Virginia/Outputs/
+Virginia/.idea/*
+.idea/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
