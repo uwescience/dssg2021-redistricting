@@ -10,12 +10,14 @@ import matplotlib.pyplot as plt
 from functools import reduce
 
 
-def plot_district_map(df, label_column, title=None, output_path=None):
+def plot_district_map(df, assignment_dict, title=None, output_path=None):
     """
-    visualize districts corresponding to a given label_column in geopandas dataframe
+    visualize districts corresponding to a given assignment_dict
+    mapping index in geopandas dataframe to desired districts per node
     If output_path not provided, will just display image. Otherwise save to location
     """
-    df.plot(column=label_column, cmap="tab20", figsize=(12, 8))
+    df['district_assignment'] = df.index.map(assignment_dict)
+    df.plot(column='district_assignment', cmap="tab20", figsize=(12, 8))
     plt.axis("off")
     if title:
         plt.title(title)

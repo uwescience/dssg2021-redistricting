@@ -66,8 +66,8 @@ print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
 # Visualize districts for existing plans
-plot_district_map(df, "CD_12", "2012 Congressional District Map")
-plot_district_map(df, "CD_16", "2016 Congressional District Map")
+plot_district_map(df, df['CD_12'].to_dict(), "2012 Congressional District Map")
+plot_district_map(df, df['CD_16'].to_dict(), "2016 Congressional District Map")
 
 
 #--- DATA CLEANING
@@ -127,9 +127,8 @@ cddict =  recursive_tree_part(graph, #graph object
                               .01, #epsilon value
                               1)
 
-df['initial'] = df.index.map(cddict)
 file_name = os.path.join(newdir, "initial_plan.png")
-plot_district_map(df, "initial", "Seed Plan: Recursive Partitioning Tree",
+plot_district_map(df, cddict, "Seed Plan: Recursive Partitioning Tree",
                   output_path=file_name)
 
 
@@ -272,9 +271,8 @@ for repart in recom_chain:
     if t % 200 == 0:
 
         print(t)
-        df[str(t)] = df.index.map(dict(repart.assignment))
         filename ="recom_plot" + str(t) + ".png"
-        plot_district_map(df, str(t),
+        plot_district_map(df, repart.assignment,
                           title=str(t) + " Steps",
                           output_path=os.path.join(newdir, filename)
                           )
@@ -360,12 +358,8 @@ for fpart in flip_chain:
         flip_pop_vec = []
         #flip_cut_vec = []
 
-df["flip"] = df.index.map(dict(fpart.assignment))
+plot_district_map(df, fpart.assignment, "Flip Proposal: 20,000 Steps")
 
-df.plot(column="flip",cmap='tab20', figsize=(12,8)) #edgecolor="face" if the lines go white (not sure why it randomly happens)
-plt.axis("off")
-plt.title("Flip Proposal: 20,000 Steps")
-plt.show()
 
 #--- BUILD VISUALIZATIONS
 
