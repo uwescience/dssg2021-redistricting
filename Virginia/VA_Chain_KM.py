@@ -7,6 +7,7 @@ Virginia Case Study
 
 import os
 import sys
+import re
 
 import csv
 import json
@@ -37,7 +38,7 @@ from gerrychain.updaters import cut_edges
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
-from utility_functions import plot_district_map, add_other_population_attribute, convert_attributes_to_int
+import utility_functions as uf
 
 #--- IMPORT DATA
 try:
@@ -66,22 +67,22 @@ print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
 # Visualize districts for existing plans
-plot_district_map(df, df['CD_12'].to_dict(), "2012 Congressional District Map")
-plot_district_map(df, df['CD_16'].to_dict(), "2016 Congressional District Map")
+uf.plot_district_map(df, df['CD_12'].to_dict(), "2012 Congressional District Map")
+uf.plot_district_map(df, df['CD_16'].to_dict(), "2016 Congressional District Map")
 
 
 #--- DATA CLEANING
-graph = convert_attributes_to_int(graph, ["G18DSEN", "G18RSEN", "G16DPRS", "G16RPRS"])
+graph = uf.convert_attributes_to_int(graph, ["G18DSEN", "G18RSEN", "G16DPRS", "G16RPRS"])
 
 # calculate non-BVAP
-graph = add_other_population_attribute(graph)
+graph = uf.add_other_population_attribute(graph)
 
 #--- GENERIC UPDATERS
 
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), #can only take in partitions
     "cut_edges": cut_edges,
-    "PP":polsby_popper
+    #"PP":polsby_popper
             }
 
 #--- ELECTION UPDATERS
@@ -120,7 +121,7 @@ updater.update(election_updaters)
 #--- STARTING PLAN (SEED PLAN)
 
 totpop = df.TOTPOP.sum()
-cddict =  recursive_tree_part(graph, #graph object
+cddict = recursive_tree_part(graph, #graph object
                               range(num_districts), #How many districts
                               totpop/num_districts, #population target
                               "TOTPOP", #population column, variable name
@@ -128,7 +129,7 @@ cddict =  recursive_tree_part(graph, #graph object
                               1)
 
 file_name = os.path.join(newdir, "initial_plan.png")
-plot_district_map(df, cddict, "Seed Plan: Recursive Partitioning Tree",
+uf.plot_district_map(df, cddict, "Seed Plan: Recursive Partitioning Tree",
                   output_path=file_name)
 
 
@@ -144,55 +145,9 @@ with open(newdir+"init.json", 'w') as jf1:
         json.dump(cddict, jf1)
 
 #--- LOOK AT STATS OF STARTING PLAN
-
-stats_df = pd.DataFrame(index=["d1_pct",
-                               "d2_pct",
-                               "d3_pct",
-                               "d4_pct",
-                               "d5_pct",
-                               "d6_pct",
-                               "d7_pct",
-                               "d8_pct",
-                               "d9_pct",
-                               "d10_pct",
-                               "d11_pct",
-                               "mean_median",
-                               "efficiency_gap",
-                               "seat_num",
-                               #"cut_edges"
-                               ],
-                        columns=election_names)
-
-for i in range(3):
-    current_column = stats_df.columns[i]
-    dist_i = initial_partition[election_names[i]].percents("First")
-    stats_df[current_column] = [float(dist_i[0]),
-                                float(dist_i[1]),
-                                float(dist_i[2]),
-                                float(dist_i[3]),
-                                float(dist_i[4]),
-                                float(dist_i[5]),
-                                float(dist_i[6]),
-                                float(dist_i[7]),
-                                float(dist_i[8]),
-                                float(dist_i[9]),
-                                float(dist_i[10]),
-                                float(mean_median(initial_partition[election_names[i]])) ,
-                                #What percent of the vote over 50% would you need to get 50% of the seats, e.g., 3, need 53% to get half of seats
-                                #Close to 0 then how symmetrical/fair is the votes
-                                float(efficiency_gap(initial_partition[election_names[i]])),
-                                float(initial_partition[election_names[i]].wins("First")),
-                                #float(len(initial_partition["cut_edges"]))
-                                ]
-
-stats_inital_df = stats_df.transpose()
-
-stats_inital_df.plot(y=['d1_pct','d2_pct','d3_pct','d4_pct','d5_pct','d6_pct',
-                        'd7_pct','d8_pct','d9_pct','d10_pct','d11_pct']
-                     )
-
-
-
+stats_df = uf.export_election_metrics_per_partition(initial_partition)
+stats_df.percent.apply(pd.Series).plot()
+plt.show()
 
 # --- PROPOSAL
 
@@ -203,7 +158,7 @@ proposal = partial(#All the functions inside gerrychain want to take partition, 
     pop_target=ideal_population,
     epsilon=0.05,
     node_repeats=1,
-    method = bipartition_tree_random
+    method=bipartition_tree_random
 )
 
 #--- CREATE CONSTRAINTS
@@ -242,123 +197,41 @@ flip_chain = MarkovChain(
 
 
 
-#--- RUN RECOMBINATION PROPOSAL
-
-recom_pop_vec = [] #total population
-recom_cut_vec = [] #cut edges
-recom_votes = [[], [], [], [],[],[]] #number of votes
-recom_mms = [] #mean-median score
-recom_egs = [] #efficiency gap score
-recom_hmss = [] #how many seats score
-
-t = 0 #keep track on how long we make it in the chain
-
-for repart in recom_chain:
-
-    recom_pop_vec.append(sorted(list(repart["population"].values())))
-    recom_cut_vec.append(len(repart["cut_edges"]))
-    recom_mms.append([])
-    recom_egs.append([])
-    recom_hmss.append([])
-
-    for elect in range(num_elections):
-        recom_votes[elect].append(sorted(repart[election_names[elect]].percents("First")))
-        recom_mms[-1].append(mean_median(repart[election_names[elect]]))
-        recom_egs[-1].append(efficiency_gap(repart[election_names[elect]]))
-        recom_hmss[-1].append(repart[election_names[elect]].wins("First"))
-
-    t += 1
-    if t % 200 == 0:
-
-        print(t)
-        filename ="recom_plot" + str(t) + ".png"
-        plot_district_map(df, repart.assignment,
-                          title=str(t) + " Steps",
-                          output_path=os.path.join(newdir, filename)
-                          )
-
-df["recom"] = df.index.map(dict(repart.assignment))
+# #--- RUN RECOMBINATION & FLIP BOUNDARY PROPOSALS & SAVE RESULTS
 
 
-#--- RUN FLIP BOUNDARY PROPOSAL
+uf.export_all_metrics_per_chain(recom_chain,
+                                output_path=os.path.join(newdir, 'recom_chain'),
+                                buffer_length=200)
 
-flip_pop_vec = [] #total population
-flip_cut_vec = [] #cut edges
-flip_votes = [[], [], [], [],[],[]] #number of votes
-flip_mms = [] #mean-median score
-flip_egs = [] #efficiency gap score
-flip_hmss = [] #how many seats score
 
-t = 0
+uf.export_all_metrics_per_chain(flip_chain,
+                                output_path=os.path.join(newdir, 'flip_chain'),
+                                buffer_length=2000
+                                )
 
-for fpart in flip_chain:
+for file in os.listdir(os.path.join(newdir, 'recom_chain')):
+    m = re.search('assignment_(\d+).json', file)
+    if m:
+        assignment = json.load(open(os.path.join(newdir,
+                                                 'recom_chain/' + file)))
+        assignment = {int(k): v for k, v in assignment.items()}
+        title = f'Recom Proposal: {m.groups()[0]} Steps'
+        uf.plot_district_map(df, assignment, title=title,
+                             output_path=os.path.join(newdir, f'recom_chain/plot_{m.groups()[0]}.png')
+                             )
 
-    flip_pop_vec.append(sorted(list(fpart["population"].values())))
-    flip_cut_vec.append(len(fpart["cut_edges"]))
-    flip_mms.append([])
-    flip_egs.append([])
-    flip_hmss.append([])
+for file in os.listdir(os.path.join(newdir, 'flip_chain')):
+    m = re.search('assignment_(\d+).json', file)
+    if m:
+        assignment = json.load(open(os.path.join(newdir,
+                                                 'flip_chain/' + file)))
+        assignment = {int(k): v for k, v in assignment.items()}
+        title = f'Flip Proposal: {m.groups()[0]} Steps'
+        uf.plot_district_map(df, assignment, title=title,
+                             output_path=os.path.join(newdir, f'flip_chain/plot_{m.groups()[0]}.png')
+                             )
 
-# Write results from flip_chain
-
-    for elect in range(num_elections):
-        flip_votes[elect].append(sorted(fpart[election_names[elect]].percents("First")))
-        flip_mms[-1].append(mean_median(fpart[election_names[elect]]))
-        flip_egs[-1].append(efficiency_gap(fpart[election_names[elect]]))
-        flip_hmss[-1].append(fpart[election_names[elect]].wins("First"))
-
-    t += 1
-
-    if t % 2000 == 0:
-
-        print(t)
-
-        with open(newdir + "flip_mms" + str(t) + ".csv", "w") as tf1:
-            writer = csv.writer(tf1, lineterminator="\n")
-            writer.writerows(flip_mms) #want to see ~0.015 for something reasonable
-
-        with open(newdir + "flip_egs" + str(t) + ".csv", "w") as tf1:
-            writer = csv.writer(tf1, lineterminator="\n")
-            writer.writerows(flip_egs)
-
-        with open(newdir + "flip_hmss" + str(t) + ".csv", "w") as tf1:
-            writer = csv.writer(tf1, lineterminator="\n")
-            writer.writerows(flip_hmss)
-
-        with open(newdir + "flip_pop" + str(t) + ".csv", "w") as tf1:
-            writer = csv.writer(tf1, lineterminator="\n")
-            writer.writerows(flip_pop_vec)
-
-        #with open(newdir + "flip_cuts" + str(t) + ".csv", "w") as tf1:
-        #    writer = csv.writer(tf1, lineterminator="\n")
-        #    writer.writerows(flip_cut_vec)
-
-        with open(newdir + "flip_assignment" + str(t) + ".json", "w") as jf1:
-            json.dump(dict(fpart.assignment), jf1)
-
-        for elect in range(num_elections):
-            with open(
-                newdir + election_names[elect] + "_flip_" + str(t) + ".csv", "w"
-            ) as tf1:
-                writer = csv.writer(tf1, lineterminator="\n")
-                writer.writerows(flip_votes[elect])
-
-        df["plot" + str(t)] = df.index.map(dict(fpart.assignment))
-        df.plot(column="plot" + str(t), cmap="tab20")
-        #edgecolor="face" if the lines go white (not sure why it randomly happens)
-        plt.axis("off")
-        plt.title(str(t) + " Steps")
-        plt.savefig(newdir + "flip_plot" + str(t) + ".png")
-        plt.close()
-
-        flip_votes =  [[], [], [], [],[],[]]
-        flip_mms = []
-        flip_egs = []
-        flip_hmss = []
-        flip_pop_vec = []
-        #flip_cut_vec = []
-
-plot_district_map(df, fpart.assignment, "Flip Proposal: 20,000 Steps")
 
 
 #--- BUILD VISUALIZATIONS
@@ -432,16 +305,29 @@ def comparison_plot(df_proposal_metric, title, election, gc_metric):
 
 #--- RECOM PROPOSAL VISUALIZATION
 
-df_recom_seats = pd.DataFrame(recom_hmss,
-                    columns=election_names)
+recom_hmss = []
+for file in os.listdir(os.path.join(newdir, 'recom_chain')):
+    m = re.search('wins_(\d+).csv', file)
+    if m:
+        recom_hmss.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
+df_recom_seats  = pd.concat(recom_hmss)
+df_recom_seats.columns = election_names
 
-df_recom_cuts = pd.DataFrame(recom_cut_vec)
+recom_mms = []
+for file in os.listdir(os.path.join(newdir, 'recom_chain')):
+    m = re.search('mean_median_(\d+).csv', file)
+    if m:
+        recom_mms.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
+df_recom_mms  = pd.concat(recom_mms)
+df_recom_mms.columns = election_names
 
-df_recom_mms = pd.DataFrame(recom_mms,
-                    columns=election_names)
-
-df_recom_egs = pd.DataFrame(recom_egs,
-                    columns=election_names)
+recom_egs = []
+for file in os.listdir(os.path.join(newdir, 'recom_chain')):
+    m = re.search('efficiency_gap_(\d+).csv', file)
+    if m:
+        recom_egs.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
+df_recom_egs = pd.concat(recom_egs)
+df_recom_egs.columns = election_names
 
 #Mean-Median
 
@@ -481,15 +367,15 @@ flip_egs = []
 #flip_cut_vec=[]
 
 for t in ts:
-    temp = np.loadtxt(datadir + "flip_hmss" + str(t) + ".csv", delimiter=",")
+    temp = np.loadtxt(datadir + f"flip_chain/wins_{str(t)}.csv", delimiter=",")
     for s in range(step_size):
         flip_seats.append(temp[s, :])
 
-    temp = np.loadtxt(datadir + "flip_mms" + str(t) + ".csv", delimiter=",")
+    temp = np.loadtxt(datadir + f"flip_chain/mean_median_{str(t)}.csv", delimiter=",")
     for s in range(step_size):
         flip_mms.append(temp[s, :])
 
-    temp = np.loadtxt(datadir + "flip_egs" + str(t) + ".csv", delimiter=",")
+    temp = np.loadtxt(datadir + f"flip_chain/efficiency_gap_{str(t)}.csv", delimiter=",")
     for s in range(step_size):
         flip_egs.append(temp[s, :])
 
