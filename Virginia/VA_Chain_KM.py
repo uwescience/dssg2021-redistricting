@@ -312,6 +312,7 @@ for file in os.listdir(os.path.join(newdir, 'recom_chain')):
         recom_hmss.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
 df_recom_seats  = pd.concat(recom_hmss)
 df_recom_seats.columns = election_names
+df_recom_seats = df_recom_seats.reset_index(drop=False)
 
 recom_mms = []
 for file in os.listdir(os.path.join(newdir, 'recom_chain')):
@@ -320,6 +321,7 @@ for file in os.listdir(os.path.join(newdir, 'recom_chain')):
         recom_mms.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
 df_recom_mms  = pd.concat(recom_mms)
 df_recom_mms.columns = election_names
+df_recom_mms = df_recom_mms.reset_index(drop=False)
 
 recom_egs = []
 for file in os.listdir(os.path.join(newdir, 'recom_chain')):
@@ -328,6 +330,7 @@ for file in os.listdir(os.path.join(newdir, 'recom_chain')):
         recom_egs.append(pd.read_csv(os.path.join(newdir, 'recom_chain/' + file), header=None))
 df_recom_egs = pd.concat(recom_egs)
 df_recom_egs.columns = election_names
+df_recom_egs = df_recom_egs.reset_index(drop=False)
 
 #Mean-Median
 
