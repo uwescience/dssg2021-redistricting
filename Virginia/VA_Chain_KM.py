@@ -40,6 +40,8 @@ from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
 import utility_functions as uf
 
+plt.style.use('seaborn-whitegrid')
+
 #--- IMPORT DATA
 try:
     os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),

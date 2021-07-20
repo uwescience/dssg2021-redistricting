@@ -25,7 +25,8 @@ def plot_district_map(df, assignment_dict, title=None, output_path=None):
     If output_path not provided, will just display image. Otherwise save to location
     """
     df['district_assignment'] = df.index.map(assignment_dict)
-    df.plot(column='district_assignment', cmap="tab20", figsize=(12, 8))
+    df.plot(column='district_assignment', edgecolor=(1, 1, 1, 0.05), 
+            cmap="tab20", figsize=(12, 8))
     plt.axis("off")
     if title:
         plt.title(title)
