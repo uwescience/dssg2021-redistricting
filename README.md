@@ -1,7 +1,7 @@
 # Developing Ensemble Methods for Initial Districting Plan Evaluation
 This repo collects associated Python scripts and data to support the 2021 UW Data Science for Social Good project, "Developing Ensemble Methods for Initial Districting Plan Evaluation".
 
-#Prerequisites
+# Prerequisites
 
 To reproduce case study results and to follow along with our stakeholder protocol, please ensure the following steps are taken first:
 
