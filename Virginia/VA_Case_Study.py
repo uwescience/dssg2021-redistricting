@@ -52,8 +52,8 @@ except OSError:
     os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
                           "Virginia"))
 
-graph = Graph.from_json("data/VA_Chain.json")
-df = gpd.read_file("data/VA_precincts.shp")
+graph = Graph.from_json("Data/VA_Chain.json")
+df = gpd.read_file("Data/VA_precincts.shp")
 
 #--- CREATE SHORTCUTS
 
@@ -369,7 +369,6 @@ ts = [x * step_size for x in range(1, int(max_steps / step_size) + 1)]
 flip_seats = []
 flip_mms = []
 flip_egs = []
-#flip_cut_vec=[]
 
 for t in ts:
     temp = np.loadtxt(datadir + f"flip_chain/wins_{str(t)}.csv", delimiter=",")
@@ -383,11 +382,6 @@ for t in ts:
     temp = np.loadtxt(datadir + f"flip_chain/efficiency_gap_{str(t)}.csv", delimiter=",")
     for s in range(step_size):
         flip_egs.append(temp[s, :])
-
-    #temp_c = np.loadtxt(datadir + "flip_cuts" + str(t) + ".csv", delimiter=",")
-    #temp_c = temp_c.transpose()
-    #for s in range(step_size):
-    #    flip_cut_vec.append(temp_c[s])
 
 df_flip_seats = pd.DataFrame(flip_seats,
                     columns=election_names)
