@@ -261,7 +261,7 @@ def comparison_hist(df_proposal_metric, title, election, gc_metric):
     plt.vlines(x=sum(df_proposal_metric)/len(df_proposal_metric),
                ymin=0,
                ymax=(np.histogram(df_proposal_metric)[0]).max(),
-               colors="blue",
+               colors="black",
                linestyles="solid",
                label="Ensemble Mean")
     plt.vlines(x=gc_metric(partition_2012[election]),
@@ -276,6 +276,8 @@ def comparison_hist(df_proposal_metric, title, election, gc_metric):
                colors="orange",
                linestyles="dashed",
                label="2016 Plan")
+    plt.xlabel('Metric Value')
+    plt.ylabel('Frequency')
     plt.legend(bbox_to_anchor=(.8, 1),
                loc='upper left', borderaxespad=0.)
     plt.show()
@@ -286,7 +288,7 @@ def comparison_plot(df_proposal_metric, title, election, gc_metric):
     plt.hlines(y=sum(df_proposal_metric)/len(df_proposal_metric),
            xmin=0,
            xmax=len(df_proposal_metric),
-           colors="blue",
+           colors="black",
            linestyles="solid",
            label="Ensemble Mean")
     plt.hlines(y=gc_metric(partition_2012[election]),
@@ -301,8 +303,10 @@ def comparison_plot(df_proposal_metric, title, election, gc_metric):
            colors="orange",
            linestyles="dashed",
            label="2016 Plan")
+    plt.xlabel('Number of Steps')
+    plt.ylabel('Metric Value')
     plt.legend(bbox_to_anchor=(.8, 1),
-           loc='upper left', borderaxespad=0.)
+               loc='upper left', borderaxespad=0.)
     plt.show()
 
 #--- RECOM PROPOSAL VISUALIZATION

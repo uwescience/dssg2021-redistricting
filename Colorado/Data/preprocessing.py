@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul 20 15:35:47 2021
-
-@author: katherinechang
+Preprocessing CO to convert shapefile to json 
 """
 
 import os
