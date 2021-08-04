@@ -1,6 +1,7 @@
 # Ignore output folders in each state folder
 Colorado/Outputs/*
 Colorado/data/RDH/*
+Colorado/Data/RDH/*
 Virginia/Outputs/
 Virginia/.idea/*
 .idea/*
