@@ -1,6 +1,6 @@
 
 """
-02. Metrics Development and Modeling Tests
+02. Exploratory Data Analysis: Metrics Development and Modeling Tests
 
 Description: This file is dedicated to state-specific metrics development and appropriate
 tests to refine modeling decisions.
