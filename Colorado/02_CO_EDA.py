@@ -54,11 +54,16 @@ df_rdh_2020 = gpd.read_file("Data/RDH/co_vest_20/co_vest_20.shp")
 
 #Secretary of State Election Data (2004-2020)
 
+df_elections_2004_2010 = pd.read_csv("Data/co_elections_2004_2010.csv")
+df_elections_2012_2020 = pd.read_csv("Data/co_elections_2012_2020.csv")
+
 #--- Political Competitiveness
 
 """
 - Different vote bands, 5%, 10%, and 15%
 - Win margin between the two major political parties
+- Probability the party affiliation of the district’s representative to change
+at least once between federal decennial censuses
 
 """
 
