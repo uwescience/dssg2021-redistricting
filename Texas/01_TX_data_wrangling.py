@@ -56,4 +56,4 @@ print(len(df[df.TOTPOP19.isna()]))
 print(df[df.CNTY_x == 201].sum()[['TOTPOP_x', 'TOTPOP19']])
 
 # save appended file
-df.to_file("~/Desktop/texas_population2020.shp")
+df.to_file("./Data/TX_VTDs_POP2019/texas_population2019.shp")
