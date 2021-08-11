@@ -39,7 +39,7 @@ from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
 import utility_functions as uf
 
-plt.style.use('seaborn-whitegrid')
+#plt.style.use('seaborn-whitegrid')
 
 #--- IMPORT DATA
 
@@ -59,7 +59,7 @@ df = gpd.read_file("Data/co_precincts.shp")
 
 state_abbr="CO"
 housen="CON"
-num_districts=7
+num_districts=8
 pop_col="TOTPOP"
 num_elections=2
 
@@ -68,12 +68,31 @@ print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
 # Visualize districts for existing plans
-uf.plot_district_map(df, df['CD116FP'].to_dict(), "Current Congressional District Map")
-#uf.plot_district_map(df, df['SLDUST'].to_dict(), "Current State Senate District Map")
-#uf.plot_district_map(df, df['SLDLST'].to_dict(), "Current State House District Map")
-
+uf.plot_district_map(df, df['CD116FP'].to_dict(), "2012 Congressional District Map")
 
 #--- DATA CLEANING
+
+
+df["POC_VAP"] = (df["HVAP"] + df["BVAP"] + df["AMINVAP"] + df["ASIANVAP"] 
+                 + df["NHPIVAP"] + df["OTHERVAP"] + df["OTHERVAP"])
+
+print(df["WVAP"].sum()/df["VAP"].sum())
+#0.7388 White VAP across the state
+
+print(df["POC_VAP"].sum() / df["VAP"].sum())
+#0.246 POC VAP across the state
+
+#uf.plot_district_map(df_mggg, df_mggg['POC_VAP_PCT'].to_dict(), "Distribution of POC VAP")
+
+#plt.hist(df_mggg['POC_VAP_PCT'])
+#plt.title("Precinct-level Distribution of CO POC Voting Age Population")
+
+for node in graph.nodes():
+    graph.nodes[node]["POC_VAP"] = (graph.nodes[node]["HVAP"] + graph.nodes[node]["BVAP"] 
+                                    + graph.nodes[node]["AMINVAP"] + graph.nodes[node]["ASIANVAP"] 
+                                    + graph.nodes[node]["NHPIVAP"] + graph.nodes[node]["OTHERVAP"] 
+                                    + graph.nodes[node]["OTHERVAP"])
+    graph.nodes[node]["nPOC_VAP"] = graph.nodes[node]["VAP"] - graph.nodes[node]["POC_VAP"]
 
 #--- GENERIC UPDATERS
 
@@ -85,18 +104,18 @@ updater = {
 #--- ELECTION UPDATERS
 
 election_names=[
-    "2018_REG_VOTERS", 
-    "2018_HOUSE" 
+    "POC_VAP", 
+    "USH18"
     ]
 
 election_columns=[
-    ["REG18D", "REG18R"], 
+    ["POC_VAP", "nPOC_VAP"], 
     ["USH18D", "USH18R"] 
     ]
 
 elections = [
     Election(
-        election_names[i], #Name of election
+        election_names[i], 
         {"First": election_columns[i][0], "Second": election_columns[i][1]},
     )
     for i in range(num_elections)
@@ -105,19 +124,21 @@ elections = [
 election_updaters = {election.name: election for election in elections}
 updater.update(election_updaters)
 
+totpop = df.TOTPOP.sum()
+
 
 #--- ENACTED PLAN BASELINE STATS
 
 partition_2012 = Partition(graph,
-                              df["CD116FP"],
-                              updater)
+                           df["CD116FP"],
+                           updater)
 
 baseline_partisan_stats_names=["mean_median_value",
-                      "efficiency_gap_value",
-                      "partisan_bias_value",
-                      "wasted_votes_value",
-                      "dem_seat_wins"
-                      ]
+                               "efficiency_gap_value",
+                               "partisan_bias_value",
+                               "wasted_votes_value",
+                               "dem_seat_wins"
+                               ]
 
 df_baseline_partisan=pd.DataFrame(index=election_names,
                          columns=baseline_partisan_stats_names)
@@ -142,9 +163,29 @@ df_enacted_map.loc[:, "ideal_population"] = sum(partition_2012["population"].val
 
 #--- STARTING PLAN (SEED PLAN)
 
-# --- PARTITION
+plan_seed = recursive_tree_part(graph, #graph object
+                                range(num_districts), #How many districts
+                                totpop/num_districts, #population target
+                                "TOTPOP", #population column, variable name
+                                .01, #epsilon value
+                                1)
 
-#--- STARTING PLAN STATS
+uf.plot_district_map(df, 
+                     plan_seed, 
+                     "Random Seed Plan") 
+    
+# --- PARTITION (SEED PLAN)
+
+partition_seed = Partition(graph,
+                           plan_seed, 
+                           updater)
+    
+  
+
+#--- STATS (SEED PLAN)
+
+stats_seed = uf.export_election_metrics_per_partition(partition_seed)
+  
 
 # --- PROPOSAL
 
