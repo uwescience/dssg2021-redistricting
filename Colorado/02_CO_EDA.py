@@ -29,6 +29,7 @@ import geopandas as gpd
 from gerrychain import Graph
 
 import networkx as nx
+import numpy as np
 import matplotlib.pyplot as plt
 
 from gerrychain import (
@@ -105,6 +106,7 @@ for node in graph_mggg.nodes():
     graph_mggg.nodes[node]["nPOC_VAP"] = graph_mggg.nodes[node]["VAP"] - graph_mggg.nodes[node]["POC_VAP"]
 
 #--- SEED PLAN/STARTING PLAN
+
 """
 CONTEXT: Need to decide the appropriate starting plan to begin the ensemble
 One option is the 2012 enacted plan -- however it has been claimed to be a Democrat
@@ -113,9 +115,12 @@ gerrymandered map by Republicans.
 Another option is to generate a collection of neutral seed plans made up of 8 districts
 organized by Democratic share of votes to indicate competitiveness
 
-PROCESS:
+PROCESS: I generated 10 seed plans and built a dataframe of their Democrat vote totals
+and Democrat seat wins using the 2018 US House election data 
     
-DECISION:
+DECISION: The Colorado analysis will use the ReCom proposal, which means the starting plan
+is not as important compared to a Flip proposal. This step wasn't very necessary, but 
+explores 
 """
 
 state_abbr="CO"
@@ -126,7 +131,7 @@ num_elections= 2
 
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
-    "cut_edges": cut_edges,
+    "cut_edges": cut_edges
             }
 
 election_names=[
@@ -157,6 +162,11 @@ plan_2012 = Partition(graph_mggg,
                       df_mggg["CD116FP"],
                       updater)
 
+
+seeds_stats = pd.DataFrame(columns=[],
+                           index=range(8))
+
+#Running multiple seeds to note the distribution of metrics of starting plans
 for n in range(10):
     plan_seed = recursive_tree_part(graph_mggg, #graph object
                                     range(num_districts), #How many districts
@@ -167,15 +177,29 @@ for n in range(10):
     uf.plot_district_map(df_mggg, 
                          plan_seed, 
                          "Seed" + str(n)) 
-    globals()['plan_seed%s' % n] = plan_seed 
+    
+    partition_seed = Partition(graph_mggg,
+                           plan_seed, 
+                           updater)
+    
+    stats_df = uf.export_election_metrics_per_partition(partition_seed)
+    
+    seed_loop = pd.DataFrame(columns=["USH18D",
+                                      "dem_seats"],
+                           index=range(8))
+    
+    for y in range(8):
+        seed_loop["USH18D"][y] = stats_df.percent["USH18"][y]
+        seed_loop["dem_seats"][y] = stats_df.wins["USH18"]
 
-partition_seed1 = Partition(graph_mggg,
-                            plan_seed1, 
-                            updater)
+    seed_loop = seed_loop.sort_values("USH18D")
+    seed_loop = seed_loop.reset_index()
+    seed_loop=seed_loop.rename(columns={"USH18D": "USH18D_seed" + str(n), 
+                                        "dem_seats": "dem_seats_seed" + str(n)})    
 
-stats_df = uf.export_election_metrics_per_partition(partition_seed1)
-stats_df.percent.apply(pd.Series).plot.scatter()
-plt.show()
+    seeds_stats = pd.concat([seeds_stats, seed_loop], axis=1)
+    
+print(seeds_stats)
 
 #--- PROPOSAL
 
@@ -183,7 +207,18 @@ plt.show()
 
 DECISION: Given that our analysis explores different options across the entire state space of Colorado,
 the ReCOM proposal is better suited for map drawing phase.
+
+
+proposal = partial(recom,
+                   pop_col="TOTPOP",
+                   pop_target=ideal_population,
+                   epsilon=0.01,
+                   node_repeats=1,
+                   method=bipartition_tree_random
+)
+
 """
+
 
 #--- ACCEPTANCE FUNCTIONS
 
@@ -192,7 +227,6 @@ CONTEXT:
 
 Political Competitiveness
 
-- Different vote bands, 5%, 10%, and 15%
 - Vote band metrics (5, 50) 45%-55%
 - Win margin between the two major political parties
 - Probability the party affiliation of the district’s representative to change
@@ -202,19 +236,40 @@ if its CPVI value is between D+5 and R+5,
 meaning that the district’s vote is within 5% of the nationwide average.
 - CVPI for Colorado U.S. Congressional Races
 
-PROCESS: Using available election data, build out table/viz margin of win for each 
-house race from 2004-2020. Note the existing human  
+PROCESS: 
 
 DECISION:
+    
+No comparison between answers between the two
+State vs. Republican
 
 """
-df2 = df_elections_2012_2020.filter(regex='^HOU$')
-elections_2020_list = list(df_elections_2012_2020.columns)
 
-df_elections_2012_2020["SEN20D"] = df_elections_2012_2020["SEN20D"]/df_elections_2012_2020["SEN20T"]
-df_elections_2012_2020["SEN20R"] = df_elections_2012_2020["SEN20R"]/df_elections_2012_2020["SEN20T"]
+       
+def competitiveness_accept(partition): 
+  
+    new = sum(x<.55 & x > .45 for x in partition["USH18"].percents("First"))
+    
+    old = sum(x<.55 & x > .45 for x in partition.parent["USH18"].percents("First")) 
 
-                                                                 
+    if new > old:  
+        return True
+    
+    else:
+        return False
+    
+def squeeze_accept(partition): 
+
+    """
+    Write a function that 
+    - Sort districts by most Democratic heavy and most Republican heavy 
+    - Assign a base value of competitiveness for each district
+    - Run chain, accept only if districts satisfy values under or order
+    """
+    
+
+
+                                                          
 #--- CONSTRAINTS
 
 """
@@ -222,3 +277,11 @@ CONTEXT:
 PROCESS:
 DECISION:
 """
+
+
+compactness_bound = constraints.UpperBound(
+    lambda p: len(p["cut_edges"]), 1.5 * len(initial_partition["cut_edges"])
+)
+
+
+#--- 
