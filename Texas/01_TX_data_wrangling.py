@@ -3,6 +3,8 @@ This script adds the ACS 2019 population totals extracted from Redisticting Data
 (https://redistrictingdatahub.org/dataset/texas-block-group-acs5-data-2019/)
 to the shape file provided by MGGG (https://www.dropbox.com/sh/k78n2hyixmv9xdg/AABmZG5ntMbXtX1VKThR7_t8a?dl=0)
 """
+import os
+import sys
 
 import geopandas as gpd
 import pandas as pd
@@ -56,4 +58,8 @@ print(len(df[df.TOTPOP19.isna()]))
 print(df[df.CNTY_x == 201].sum()[['TOTPOP_x', 'TOTPOP19']])
 
 # save appended file
-df.to_file("./Data/TX_VTDs_POP2019/texas_population2019.shp")
+DIR = os.path.join('./Data', 'TX_VTDs_POP2019')
+if not os.path.exists(DIR):
+    os.mkdir(DIR)
+
+df.to_file(os.path.join(DIR, "texas_population2019.shp"))
