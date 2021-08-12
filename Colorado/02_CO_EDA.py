@@ -21,7 +21,6 @@ contribute to the political well-being of key communities of interest and politi
 
 
 """
-
 import os
 import sys
 import random
@@ -43,7 +42,7 @@ from gerrychain import (
     updaters,
 )
 from gerrychain.metrics import efficiency_gap, mean_median, polsby_popper, wasted_votes
-from gerrychain.updaters import cut_edges
+from gerrychain.updaters import cut_edges, county_splits
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
@@ -163,6 +162,7 @@ plan_2012 = Partition(graph_mggg,
                       df_mggg["CD116FP"],
                       updater)
 
+
 seeds_stats = pd.DataFrame(columns=[],
                            index=range(8))
 
@@ -270,9 +270,17 @@ def squeeze_accept(partition):
     - Run chain, accept only if districts satisfy values under or order
     """
     
+def num_splits(partition, df=df_mggg):
+    df["current"] = df.index.map(partition.assignment)
+    return sum(df.groupby('COUNTYFP')['current'].nunique() > 1)
 
-
+election_updaters.update({"County Splits": num_splits})
                                                           
+print(len(df_mggg['COUNTYFP'].unique())) #64 different counties in CO
+print(num_splits(partition_2012)) #7 county splits in 2012 plan
+print(num_splits(partition_seed)) 
+
+
 #--- CONSTRAINTS
 
 """
@@ -281,16 +289,7 @@ PROCESS:
 DECISION:
 """
 
-""" COUNTY SPLITS
-def num_splits(partition, df=df):
-    df["current"] = df['node_names'].map(partition.assignment)
-    return sum(df.groupby('City/Town')['current'].nunique()) - df['City/Town'].nunique()
-
-county_bound = county_splits(partition_seed, "COUNTYFP")
-
-county_bound = gerrychain.constraints.refuse_new_splits("COUNTYFP")
-
-"""
+cut_edges_constraint = constraints.UpperBound(number_of_cut_edges, 250)
 
 compactness_bound = constraints.UpperBound(
     lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
