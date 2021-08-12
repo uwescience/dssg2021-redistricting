@@ -27,13 +27,13 @@ from gerrychain import (
     Graph,
     MarkovChain,
     Partition,
-    accept, #always_accept, acceptance functions
+    accept, 
     constraints,
     updaters,
 )
 from gerrychain.metrics import efficiency_gap, mean_median, polsby_popper, wasted_votes, partisan_bias
 from gerrychain.proposals import recom, propose_random_flip
-from gerrychain.updaters import cut_edges
+from gerrychain.updaters import cut_edges, county_splits
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
@@ -59,7 +59,7 @@ df = gpd.read_file("Data/co_precincts.shp")
 
 state_abbr="CO"
 housen="CON"
-num_districts=8
+num_districts=7
 pop_col="TOTPOP"
 num_elections=2
 
@@ -67,25 +67,12 @@ newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
-# Visualize districts for existing plans
 uf.plot_district_map(df, df['CD116FP'].to_dict(), "2012 Congressional District Map")
 
 #--- DATA CLEANING
 
-
 df["POC_VAP"] = (df["HVAP"] + df["BVAP"] + df["AMINVAP"] + df["ASIANVAP"] 
                  + df["NHPIVAP"] + df["OTHERVAP"] + df["OTHERVAP"])
-
-print(df["WVAP"].sum()/df["VAP"].sum())
-#0.7388 White VAP across the state
-
-print(df["POC_VAP"].sum() / df["VAP"].sum())
-#0.246 POC VAP across the state
-
-#uf.plot_district_map(df_mggg, df_mggg['POC_VAP_PCT'].to_dict(), "Distribution of POC VAP")
-
-#plt.hist(df_mggg['POC_VAP_PCT'])
-#plt.title("Precinct-level Distribution of CO POC Voting Age Population")
 
 for node in graph.nodes():
     graph.nodes[node]["POC_VAP"] = (graph.nodes[node]["HVAP"] + graph.nodes[node]["BVAP"] 
@@ -98,7 +85,8 @@ for node in graph.nodes():
 
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
-    "cut_edges": cut_edges
+    "cut_edges": cut_edges,
+    "PP":polsby_popper 
             }
 
 #--- ELECTION UPDATERS
@@ -126,39 +114,19 @@ updater.update(election_updaters)
 
 totpop = df.TOTPOP.sum()
 
-
 #--- ENACTED PLAN BASELINE STATS
 
 partition_2012 = Partition(graph,
                            df["CD116FP"],
                            updater)
 
-baseline_partisan_stats_names=["mean_median_value",
-                               "efficiency_gap_value",
-                               "partisan_bias_value",
-                               "wasted_votes_value",
-                               "dem_seat_wins"
-                               ]
 
-df_baseline_partisan=pd.DataFrame(index=election_names,
-                         columns=baseline_partisan_stats_names)
+stats_2012_df = uf.export_election_metrics_per_partition(partition_2012)
 
-for n in range(len(election_names)):
-    df_baseline_partisan.iloc[n,0] = mean_median(partition_2012[election_names[n]])
-    df_baseline_partisan.iloc[n,1] = efficiency_gap(partition_2012[election_names[n]])
-    df_baseline_partisan.iloc[n,2] = partisan_bias(partition_2012[election_names[n]])
+stats_2012_df.loc[:, "cut_edges_value"] = len(partition_2012["cut_edges"])
+stats_2012_df.loc[:, "ideal_population"] = sum(partition_2012["population"].values()) / len(partition_2012)
 
-    df_baseline_partisan.iloc[n,3] = wasted_votes(df[election_columns[n][0]].sum(), 
-                                         df[election_columns[n][1]].sum())
-    df_baseline_partisan.iloc[n,4] = partition_2012[election_names[n]].wins("First")
-
-
-df_enacted_map = pd.DataFrame(index=["2010 Cycle"],
-                              columns=["cut_edges_value",
-                                       "ideal_population"])
-
-df_enacted_map.loc[:, "cut_edges_value"] = len(partition_2012["cut_edges"])
-df_enacted_map.loc[:, "ideal_population"] = sum(partition_2012["population"].values()) / len(partition_2012)
+sum(i < 0.55 for i in stats_2012_df["percent"][1]) #number of "competitive" districts
 
 
 #--- STARTING PLAN (SEED PLAN)
@@ -170,31 +138,109 @@ plan_seed = recursive_tree_part(graph, #graph object
                                 .01, #epsilon value
                                 1)
 
-uf.plot_district_map(df, 
-                     plan_seed, 
-                     "Random Seed Plan") 
     
 # --- PARTITION (SEED PLAN)
 
 partition_seed = Partition(graph,
                            plan_seed, 
                            updater)
-    
-  
 
 #--- STATS (SEED PLAN)
 
-stats_seed = uf.export_election_metrics_per_partition(partition_seed)
-  
+stats_seed_df = uf.export_election_metrics_per_partition(partition_2012)
+
+uf.plot_district_map(df, 
+                     plan_seed, 
+                     "Random Seed Plan Map") 
 
 # --- PROPOSAL
 
+ideal_population = sum(partition_seed["population"].values()) / len(partition_seed)
+
+proposal = partial(
+    recom,
+    pop_col="TOTPOP",
+    pop_target=ideal_population,
+    epsilon=0.01,
+    node_repeats=1,
+    method=bipartition_tree_random
+)
+
 #--- CREATE CONSTRAINTS
+
+#Minimize County Splits, Compactness Score 
+
+popbound = constraints.within_percent_of_ideal_population(partition_seed, 0.01)
+
+""" COUNTY SPLITS
+def num_splits(partition, df=df):
+    df["current"] = df['node_names'].map(partition.assignment)
+    return sum(df.groupby('City/Town')['current'].nunique()) - df['City/Town'].nunique()
+
+county_bound = county_splits(partition_seed, "COUNTYFP")
+
+county_bound = gerrychain.constraints.refuse_new_splits("COUNTYFP")
+
+"""
+
+compactness_bound = constraints.UpperBound(
+    lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
+)
 
 #--- ACCEPTANCE FUNCTIONS
 
+def competitive_accept(partition):
+    new_score = 0 
+    old_score = 0 
+    for i in range(7):
+        if .45 < partition.parent['USH18'].percents("First")[i] <.55:
+            old_score += 1
+            
+        if .45 < partition['USH18'].percents("First")[i] <.55:
+            new_score += 1
+            
+    if new_score >= old_score:
+        return True
+    
+    elif random.random() < .05:
+        return True
+    else:
+        return False
+
 #--- MCMC CHAINS
 
+chain = MarkovChain(
+    proposal=proposal,
+    constraints=[
+        constraints.within_percent_of_ideal_population(partition_seed, 0.01),
+        compactness_bound,
+    ],
+    accept=competitive_accept, 
+    initial_state=partition_seed,
+    total_steps=2000
+)
+
 #--- RUN CHAINS
+
+dem_seats = []
+comps = []
+
+chain_loop = pd.DataFrame(columns=[],
+                         index=df.index)
+n=0
+for part in chain: 
+    df['current'] = df.index.map(dict(part.assignment))
+    #df.plot(column='current',cmap='tab20')
+    #plt.axis('off')
+    
+    chain_loop['current'] = df['current']
+    chain_loop=chain_loop.rename(columns={'current': 'step_' + str(n)})    
+
+    dem_seats.append(part['USH18'].wins('First'))
+    comps.append(sum([.45<x<.55 for x in part['USH18'].percents('First')]))
+    n+=1
+
+plt.hist(comps)
+plt.hist(dem_seats)
 
 #--- BUILD VISUALIZATIONS

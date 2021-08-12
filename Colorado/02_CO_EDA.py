@@ -24,6 +24,7 @@ contribute to the political well-being of key communities of interest and politi
 
 import os
 import sys
+import random
 import pandas as pd
 import geopandas as gpd
 from gerrychain import Graph
@@ -85,7 +86,7 @@ df_elections_2012_2020 = pd.read_csv("Data/co_elections_2012_2020.csv")
 df_mggg["POC_VAP"] = (df_mggg["HVAP"] + df_mggg["BVAP"] + df_mggg["AMINVAP"] + df_mggg["ASIANVAP"] 
  + df_mggg["NHPIVAP"] + df_mggg["OTHERVAP"] + df_mggg["OTHERVAP"])
 
-#df_mggg["POC_VAP_PCT"] = df_mggg["POC_VAP"]/df_mggg["VAP"]
+df_mggg["POC_VAP_PCT"] = df_mggg["POC_VAP"]/df_mggg["VAP"]
 
 print(df_mggg["WVAP"].sum()/df_mggg["VAP"].sum())
 #0.7388 White VAP across the state
@@ -93,10 +94,10 @@ print(df_mggg["WVAP"].sum()/df_mggg["VAP"].sum())
 print(df_mggg["POC_VAP"].sum() / df_mggg["VAP"].sum())
 #0.246 POC VAP across the state
 
-#uf.plot_district_map(df_mggg, df_mggg['POC_VAP_PCT'].to_dict(), "Distribution of POC VAP")
+uf.plot_district_map(df_mggg, df_mggg['POC_VAP_PCT'].to_dict(), "Distribution of POC VAP")
 
-#plt.hist(df_mggg['POC_VAP_PCT'])
-#plt.title("Precinct-level Distribution of CO POC Voting Age Population")
+plt.hist(df_mggg['POC_VAP_PCT'])
+plt.title("Precinct-level Distribution of CO POC Voting Age Population")
 
 for node in graph_mggg.nodes():
     graph_mggg.nodes[node]["POC_VAP"] = (graph_mggg.nodes[node]["HVAP"] + graph_mggg.nodes[node]["BVAP"] 
@@ -125,7 +126,7 @@ explores
 
 state_abbr="CO"
 housen="CON"
-num_districts=8
+num_districts=7
 pop_col="TOTPOP"
 num_elections= 2
 
@@ -161,7 +162,6 @@ totpop = df_mggg.TOTPOP.sum()
 plan_2012 = Partition(graph_mggg,
                       df_mggg["CD116FP"],
                       updater)
-
 
 seeds_stats = pd.DataFrame(columns=[],
                            index=range(8))
@@ -219,7 +219,6 @@ proposal = partial(recom,
 
 """
 
-
 #--- ACCEPTANCE FUNCTIONS
 
 """
@@ -244,17 +243,21 @@ No comparison between answers between the two
 State vs. Republican
 
 """
-
-       
-def competitiveness_accept(partition): 
-  
-    new = sum(x<.55 & x > .45 for x in partition["USH18"].percents("First"))
-    
-    old = sum(x<.55 & x > .45 for x in partition.parent["USH18"].percents("First")) 
-
-    if new > old:  
+def competitive_accept(partition):
+    new_score = 0 
+    old_score = 0 
+    for i in range(7):
+        if .45 < partition.parent['USH18'].percents("First")[i] <.55:
+            old_score += 1
+            
+        if .45 < partition['USH18'].percents("First")[i] <.55:
+            new_score += 1
+            
+    if new_score >= old_score:
         return True
     
+    elif random.random() < .05:
+        return True
     else:
         return False
     
@@ -278,9 +281,19 @@ PROCESS:
 DECISION:
 """
 
+""" COUNTY SPLITS
+def num_splits(partition, df=df):
+    df["current"] = df['node_names'].map(partition.assignment)
+    return sum(df.groupby('City/Town')['current'].nunique()) - df['City/Town'].nunique()
+
+county_bound = county_splits(partition_seed, "COUNTYFP")
+
+county_bound = gerrychain.constraints.refuse_new_splits("COUNTYFP")
+
+"""
 
 compactness_bound = constraints.UpperBound(
-    lambda p: len(p["cut_edges"]), 1.5 * len(initial_partition["cut_edges"])
+    lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
 )
 
 
