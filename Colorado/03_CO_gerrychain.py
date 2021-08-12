@@ -67,7 +67,8 @@ newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
-uf.plot_district_map(df, df['CD116FP'].to_dict(), "2012 Congressional District Map")
+uf.plot_district_map(df, df['CD116FP'].to_dict(), "2012 Colorado Congressional District Map")
+uf.plot_district_map(df, df['COUNTYFP'].to_dict(), "Colorado County Map")
 
 #--- DATA CLEANING
 
@@ -83,10 +84,15 @@ for node in graph.nodes():
 
 #--- GENERIC UPDATERS
 
+def num_splits(partition, df=df):
+    df["current"] = df.index.map(partition.assignment)
+    return sum(df.groupby('COUNTYFP')['current'].nunique() > 1)
+
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
     "cut_edges": cut_edges,
-    "PP":polsby_popper 
+    "PP":polsby_popper,
+    "count_splits": num_splits
             }
 
 #--- ELECTION UPDATERS
@@ -120,14 +126,14 @@ partition_2012 = Partition(graph,
                            df["CD116FP"],
                            updater)
 
-
 stats_2012_df = uf.export_election_metrics_per_partition(partition_2012)
 
 stats_2012_df.loc[:, "cut_edges_value"] = len(partition_2012["cut_edges"])
 stats_2012_df.loc[:, "ideal_population"] = sum(partition_2012["population"].values()) / len(partition_2012)
+stats_2012_df.loc[:, "county_splits"] = partition_2012["count_splits"]
 
 sum(i < 0.55 for i in stats_2012_df["percent"][1]) #number of "competitive" districts
-
+print(partition_2012["count_splits"]) #7 county splits in the 2012 map
 
 #--- STARTING PLAN (SEED PLAN)
 
@@ -144,6 +150,8 @@ plan_seed = recursive_tree_part(graph, #graph object
 partition_seed = Partition(graph,
                            plan_seed, 
                            updater)
+
+partition_seed["count_splits"]
 
 #--- STATS (SEED PLAN)
 
@@ -168,26 +176,24 @@ proposal = partial(
 
 #--- CREATE CONSTRAINTS
 
-#Minimize County Splits, Compactness Score 
-
 popbound = constraints.within_percent_of_ideal_population(partition_seed, 0.01)
-
-""" COUNTY SPLITS
-def num_splits(partition, df=df):
-    df["current"] = df['node_names'].map(partition.assignment)
-    return sum(df.groupby('City/Town')['current'].nunique()) - df['City/Town'].nunique()
-
-county_bound = county_splits(partition_seed, "COUNTYFP")
-
-county_bound = gerrychain.constraints.refuse_new_splits("COUNTYFP")
-
-"""
 
 compactness_bound = constraints.UpperBound(
     lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
 )
 
+def county_constraint(partition): 
+    return partition["count_splits"] <= 10
+
 #--- ACCEPTANCE FUNCTIONS
+
+def county_splits_accept(partition):
+    if partition["count_splits"] < partition.parent["count_splits"]:
+        return True        
+    elif random.random() < .05:
+        return True
+    else:
+        return False
 
 def competitive_accept(partition):
     new_score = 0 
@@ -214,30 +220,33 @@ chain = MarkovChain(
     constraints=[
         constraints.within_percent_of_ideal_population(partition_seed, 0.01),
         compactness_bound,
+        county_constraint
     ],
     accept=competitive_accept, 
-    initial_state=partition_seed,
-    total_steps=2000
+    initial_state=partition_2012,
+    total_steps=100
 )
 
 #--- RUN CHAINS
 
 dem_seats = []
 comps = []
+splits = []
 
 chain_loop = pd.DataFrame(columns=[],
                          index=df.index)
 n=0
 for part in chain: 
-    df['current'] = df.index.map(dict(part.assignment))
+    #df['current'] = df.index.map(dict(part.assignment))
     #df.plot(column='current',cmap='tab20')
-    #plt.axis('off')
+    plt.axis('off')
     
     chain_loop['current'] = df['current']
     chain_loop=chain_loop.rename(columns={'current': 'step_' + str(n)})    
 
     dem_seats.append(part['USH18'].wins('First'))
     comps.append(sum([.45<x<.55 for x in part['USH18'].percents('First')]))
+    print(num_splits(part))
     n+=1
 
 plt.hist(comps)
