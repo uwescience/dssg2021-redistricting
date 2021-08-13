@@ -34,7 +34,8 @@ from gerrychain import (
 from gerrychain.metrics import efficiency_gap, mean_median, polsby_popper, wasted_votes, partisan_bias
 from gerrychain.proposals import recom, propose_random_flip
 from gerrychain.updaters import cut_edges, county_splits
-from gerrychain.tree import recursive_tree_part, bipartition_tree_random
+from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph, \
+                            find_balanced_edge_cuts_memoization, random_spanning_tree
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
 import utility_functions as uf
@@ -137,6 +138,7 @@ print(partition_2012["count_splits"]) #7 county splits in the 2012 map
 
 #--- STARTING PLAN (SEED PLAN)
 
+
 plan_seed = recursive_tree_part(graph, #graph object
                                 range(num_districts), #How many districts
                                 totpop/num_districts, #population target
@@ -144,7 +146,6 @@ plan_seed = recursive_tree_part(graph, #graph object
                                 .01, #epsilon value
                                 1)
 
-    
 # --- PARTITION (SEED PLAN)
 
 partition_seed = Partition(graph,
@@ -163,6 +164,69 @@ uf.plot_district_map(df,
 
 # --- PROPOSAL
 
+def get_spanning_tree_u_w(G):
+    node_set=set(G.nodes())
+    x0=random.choice(tuple(node_set))
+    x1=x0
+    while x1==x0:
+        x1=random.choice(tuple(node_set))
+    node_set.remove(x1)
+    tnodes ={x1}
+    tedges=[]
+    current=x0
+    current_path=[x0]
+    current_edges=[]
+    while node_set != set():
+        next=random.choice(list(G.neighbors(current)))
+        current_edges.append((current,next))
+        current = next
+        current_path.append(next)
+        if next in tnodes:
+            for x in current_path[:-1]:
+                node_set.remove(x)
+                tnodes.add(x)
+            for ed in current_edges:
+                tedges.append(ed)
+            current_edges = []
+            if node_set != set():
+                current=random.choice(tuple(node_set))
+            current_path=[current]
+        if next in current_path[:-1]:
+            current_path.pop()
+            current_edges.pop()
+            for i in range(len(current_path)):
+                if current_edges !=[]:
+                    current_edges.pop()
+                if current_path.pop() == next:
+                    break
+            if len(current_path)>0:
+                current=current_path[-1]
+            else:
+                current=random.choice(tuple(node_set))
+                current_path=[current]
+    #tgraph = Graph()
+    #tgraph.add_edges_from(tedges)
+    return G.edge_subgraph(tedges)
+
+def my_uu_bipartition_tree_random(graph, pop_col, pop_target, epsilon, node_repeats=1, 
+                                  spanning_tree=None, choice=random.choice):
+    county_weight = 20
+    populations = {node: graph.nodes[node][pop_col] for node in graph}
+    possible_cuts = []
+    if spanning_tree is None:
+        spanning_tree = get_spanning_tree_u_w(graph)
+    while len(possible_cuts) == 0:
+        for edge in graph.edges():
+            if graph.nodes[edge[0]]["COUNTYFP"] == graph.nodes[edge[1]]["COUNTYFP"]:
+                graph.edges[edge]["weight"] = county_weight * random.random()
+            else:
+                graph.edges[edge]["weight"] = random.random()
+#         spanning_tree = tree.random_spanning_tree(graph)
+        spanning_tree = get_spanning_tree_u_w(graph)
+        h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon)
+        possible_cuts = find_balanced_edge_cuts_memoization(h, choice=choice)
+    return choice(possible_cuts).subset
+
 ideal_population = sum(partition_seed["population"].values()) / len(partition_seed)
 
 proposal = partial(
@@ -171,7 +235,7 @@ proposal = partial(
     pop_target=ideal_population,
     epsilon=0.01,
     node_repeats=1,
-    method=bipartition_tree_random
+    method=my_uu_bipartition_tree_random
 )
 
 #--- CREATE CONSTRAINTS
@@ -182,20 +246,10 @@ compactness_bound = constraints.UpperBound(
     lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
 )
 
-def county_constraint(partition): 
-    return partition["count_splits"] <= 10
 
 #--- ACCEPTANCE FUNCTIONS
 
-def county_splits_accept(partition):
-    if partition["count_splits"] < partition.parent["count_splits"]:
-        return True        
-    elif random.random() < .05:
-        return True
-    else:
-        return False
-
-def competitive_accept(partition):
+def competitive_county_accept(partition):
     new_score = 0 
     old_score = 0 
     for i in range(7):
@@ -205,10 +259,11 @@ def competitive_accept(partition):
         if .45 < partition['USH18'].percents("First")[i] <.55:
             new_score += 1
             
-    if new_score >= old_score:
+    if (new_score >= old_score) & (partition["count_splits"] < partition.parent["count_splits"]):
         return True
-    
-    elif random.random() < .05:
+    elif (new_score >= old_score)  & (random.random() < .05):
+        return True
+    elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05): 
         return True
     else:
         return False
@@ -219,12 +274,11 @@ chain = MarkovChain(
     proposal=proposal,
     constraints=[
         constraints.within_percent_of_ideal_population(partition_seed, 0.01),
-        compactness_bound,
-        county_constraint
+        compactness_bound
     ],
-    accept=competitive_accept, 
-    initial_state=partition_2012,
-    total_steps=100
+    accept=competitive_county_accept, 
+    initial_state=partition_seed,
+    total_steps=30
 )
 
 #--- RUN CHAINS
@@ -237,8 +291,8 @@ chain_loop = pd.DataFrame(columns=[],
                          index=df.index)
 n=0
 for part in chain: 
-    #df['current'] = df.index.map(dict(part.assignment))
-    #df.plot(column='current',cmap='tab20')
+    df['current'] = df.index.map(dict(part.assignment))
+    df.plot(column='current',cmap='tab20')
     plt.axis('off')
     
     chain_loop['current'] = df['current']
