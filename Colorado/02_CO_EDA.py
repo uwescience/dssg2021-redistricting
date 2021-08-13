@@ -69,6 +69,7 @@ nx.draw(graph_mggg,pos = {node:(graph_mggg.nodes[node]["C_X"],graph_mggg.nodes[n
                      for node in graph_mggg.nodes()},node_color=[graph_mggg.nodes[node]["CD116FP"] 
                                                             for node in graph_mggg.nodes()],node_size=10,cmap='tab20')
 #Redistricting Data Hub
+"""
 df_rdh_2016 = gpd.read_file("Data/RDH/co_vest_16/co_vest_16.shp")                      
 df_rdh_2018 = gpd.read_file("Data/RDH/co_vest_18/co_vest_18.shp")
 df_rdh_2020 = gpd.read_file("Data/RDH/co_vest_20/co_vest_20.shp")
@@ -77,7 +78,7 @@ df_rdh_2020 = gpd.read_file("Data/RDH/co_vest_20/co_vest_20.shp")
 
 df_elections_2004_2010 = pd.read_csv("Data/co_elections_2004_2010.csv")
 df_elections_2012_2020 = pd.read_csv("Data/co_elections_2012_2020.csv")
-
+"""
 #--- DATA WORK
 
 #POC Voting age population for Colorado in 2018
@@ -127,22 +128,37 @@ state_abbr="CO"
 housen="CON"
 num_districts=7
 pop_col="TOTPOP"
-num_elections= 2
+num_elections= 7
+
+def num_splits(partition, df=df_mggg):
+    df["current"] = df.index.map(partition.assignment)
+    return sum(df.groupby('COUNTYFP')['current'].nunique() > 1)
 
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
-    "cut_edges": cut_edges
+    "cut_edges": cut_edges,
+    "PP":polsby_popper,
+    "count_splits": num_splits
             }
 
 election_names=[
     "POC_VAP", 
     "USH18", 
-
+    "GOV18", 
+    "AG18", 
+    "SOS18", 
+    "TRE18", 
+    "REG18", 
     ]
 
 election_columns=[
     ["POC_VAP", "nPOC_VAP"], 
     ["USH18D", "USH18R"], 
+    ["GOV18D", "GOV18R"], 
+    ["AG18D", "AG18R"], 
+    ["SOS18D", "SOS18R"], 
+    ["TRE18D", "TRE18R"], 
+    ["REG18D", "REG18R"]
     ]
 
 elections = [
@@ -162,21 +178,20 @@ plan_2012 = Partition(graph_mggg,
                       df_mggg["CD116FP"],
                       updater)
 
-
 seeds_stats = pd.DataFrame(columns=[],
-                           index=range(8))
+                           index=range(7))
 
-#Running multiple seeds to note the distribution of metrics of starting plans
-for n in range(10):
+seeds_county=[]
+seeds_comp=[]
+#Running multiple seeds to note comp districts and county splits of starting plans
+for n in range(50):
     plan_seed = recursive_tree_part(graph_mggg, #graph object
                                     range(num_districts), #How many districts
                                     totpop/num_districts, #population target
                                     "TOTPOP", #population column, variable name
                                     .01, #epsilon value
                                     1)
-    uf.plot_district_map(df_mggg, 
-                         plan_seed, 
-                         "Seed" + str(n)) 
+    #uf.plot_district_map(df_mggg, plan_seed, "Seed" + str(n)) 
     
     partition_seed = Partition(graph_mggg,
                            plan_seed, 
@@ -184,22 +199,14 @@ for n in range(10):
     
     stats_df = uf.export_election_metrics_per_partition(partition_seed)
     
-    seed_loop = pd.DataFrame(columns=["USH18D",
-                                      "dem_seats"],
-                           index=range(8))
+    stats_df.iloc[0, 1] = float('NaN') #efficiency_gap
+    stats_df.iloc[0, 2] = float('NaN') #mean_median
     
-    for y in range(8):
-        seed_loop["USH18D"][y] = stats_df.percent["USH18"][y]
-        seed_loop["dem_seats"][y] = stats_df.wins["USH18"]
-
-    seed_loop = seed_loop.sort_values("USH18D")
-    seed_loop = seed_loop.reset_index()
-    seed_loop=seed_loop.rename(columns={"USH18D": "USH18D_seed" + str(n), 
-                                        "dem_seats": "dem_seats_seed" + str(n)})    
-
-    seeds_stats = pd.concat([seeds_stats, seed_loop], axis=1)
-    
-print(seeds_stats)
+    seeds_county.append(partition_seed["count_splits"])
+    seeds_comp.append(sum([.45<x<.55 for x in partition_seed['USH18'].percents('First')]))
+  
+plt.hist(seeds_county)
+plt.hist(seeds_comp)
 
 #--- PROPOSAL
 
@@ -243,7 +250,8 @@ No comparison between answers between the two
 State vs. Republican
 
 """
-def competitive_accept(partition):
+
+def competitive_county_accept(partition):
     new_score = 0 
     old_score = 0 
     for i in range(7):
@@ -253,10 +261,11 @@ def competitive_accept(partition):
         if .45 < partition['USH18'].percents("First")[i] <.55:
             new_score += 1
             
-    if new_score >= old_score:
+    if (new_score >= old_score) & (partition["count_splits"] < partition.parent["count_splits"]):
         return True
-    
-    elif random.random() < .05:
+    elif (new_score >= old_score)  & (random.random() < .05):
+        return True
+    elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05): 
         return True
     else:
         return False
@@ -269,17 +278,6 @@ def squeeze_accept(partition):
     - Assign a base value of competitiveness for each district
     - Run chain, accept only if districts satisfy values under or order
     """
-    
-def num_splits(partition, df=df_mggg):
-    df["current"] = df.index.map(partition.assignment)
-    return sum(df.groupby('COUNTYFP')['current'].nunique() > 1)
-
-election_updaters.update({"County Splits": num_splits})
-                                                          
-print(len(df_mggg['COUNTYFP'].unique())) #64 different counties in CO
-print(num_splits(partition_2012)) #7 county splits in 2012 plan
-print(num_splits(partition_seed)) 
-
 
 #--- CONSTRAINTS
 
