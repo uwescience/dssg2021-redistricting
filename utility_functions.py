@@ -18,15 +18,20 @@ from gerrychain import Election, Partition
 from gerrychain.metrics import efficiency_gap, mean_median, polsby_popper, wasted_votes
 
 
-def plot_district_map(df, assignment_dict, title=None, output_path=None):
+def plot_district_map(df, assignment_dict, title=None, output_path=None, map_colors=None):
     """
     visualize districts corresponding to a given assignment_dict
     mapping index in geopandas dataframe to desired districts per node
     If output_path not provided, will just display image. Otherwise save to location
+    
+    To customize map colors, input chosen string name of matplotlib's built-in colormaps in map_colors
+    If map_colors not provided, cmap will be set to default
+    https://matplotlib.org/stable/gallery/color/colormap_reference.html
+    https://matplotlib.org/stable/tutorials/colors/colormaps.html
     """
     df['district_assignment'] = df.index.map(assignment_dict)
     df.plot(column='district_assignment', edgecolor=(1, 1, 1, 0.05), 
-            cmap="tab20", figsize=(12, 8))
+            cmap=map_colors, figsize=(12, 8))
     plt.axis("off")
     if title:
         plt.title(title)
