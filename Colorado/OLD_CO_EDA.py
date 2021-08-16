@@ -13,13 +13,6 @@ past election results,
 a proposed district’s political party registration data,
 and evidence-based analyses of proposed districts.”
 
-"“Competitive elections for members of the United States House of Representatives 
-provide voters with a meaningful choice among candidates, 
-promote a healthy democracy, 
-help ensure that constituents receive fair and effective representation, and 
-contribute to the political well-being of key communities of interest and political subdivisions”"
-
-
 """
 import os
 import sys
@@ -56,7 +49,7 @@ except OSError:
                           "Colorado"))
     os.chdir(os.path.join(os.getenv("REDISTRICTING_HOME", default=""),
                           "Colorado"))
-       
+
 #--- IMPORT DIFFERENT DATA TO EXPLORE
 
 #Metric Geometry and Gerrymandering Group
@@ -72,8 +65,9 @@ nx.draw(graph_mggg,pos = {node:(graph_mggg.nodes[node]["C_X"],graph_mggg.nodes[n
                      for node in graph_mggg.nodes()},node_color=[graph_mggg.nodes[node]["CD116FP"] 
                                                             for node in graph_mggg.nodes()],node_size=10,cmap='tab20')
 #Redistricting Data Hub
-"""
-df_rdh_2016 = gpd.read_file("Data/RDH/co_vest_16/co_vest_16.shp")                      
+"""                   
+df_rdh_2016 = gpd.read_file("Data/RDH/co_vest_16/co_vest_16.shp")
+
 df_rdh_2018 = gpd.read_file("Data/RDH/co_vest_18/co_vest_18.shp")
 df_rdh_2020 = gpd.read_file("Data/RDH/co_vest_20/co_vest_20.shp")
 
@@ -87,6 +81,7 @@ df_elections_2012_2020 = pd.read_csv("Data/co_elections_2012_2020.csv")
 #POC Voting age population for Colorado in 2018
 
 df_mggg["POC_VAP"] = (df_mggg["HVAP"] + df_mggg["BVAP"] + df_mggg["AMINVAP"] + df_mggg["ASIANVAP"] 
+
  + df_mggg["NHPIVAP"] + df_mggg["OTHERVAP"] + df_mggg["OTHERVAP"])
 
 df_mggg["POC_VAP_PCT"] = df_mggg["POC_VAP"]/df_mggg["VAP"]
@@ -103,9 +98,11 @@ plt.hist(df_mggg['POC_VAP_PCT'])
 plt.title("Precinct-level Distribution of CO POC Voting Age Population")
 
 for node in graph_mggg.nodes():
+
     graph_mggg.nodes[node]["POC_VAP"] = (graph_mggg.nodes[node]["HVAP"] + graph_mggg.nodes[node]["BVAP"] 
                                     + graph_mggg.nodes[node]["AMINVAP"] + graph_mggg.nodes[node]["ASIANVAP"] 
                                     + graph_mggg.nodes[node]["NHPIVAP"] + graph_mggg.nodes[node]["OTHERVAP"] 
+
                                     + graph_mggg.nodes[node]["OTHERVAP"])
     graph_mggg.nodes[node]["nPOC_VAP"] = graph_mggg.nodes[node]["VAP"] - graph_mggg.nodes[node]["POC_VAP"]
 
@@ -116,15 +113,18 @@ CONTEXT: Need to decide the appropriate starting plan to begin the ensemble
 One option is the 2012 enacted plan -- however it has been claimed to be a Democrat
 gerrymandered map by Republicans. 
 
+
 Another option is to generate a collection of neutral seed plans made up of 7 districts
 organized by Democratic share of votes to indicate competitiveness
 
 PROCESS: I generated 10 seed plans and built a dataframe of their Democrat vote totals
+
 and Democrat seat wins using the 2018 US House election data 
     
 DECISION: The Colorado analysis will use the ReCom proposal, which means the starting plan
 is not as important compared to a Flip proposal. This step wasn't very necessary, but 
 explores 
+
 """
 
 state_abbr="CO"
@@ -139,12 +139,14 @@ def num_splits(partition, df=df_mggg):
 
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
+
     "cut_edges": cut_edges,
     "PP":polsby_popper,
     "count_splits": num_splits
             }
 
 election_names=[
+
     "POC_VAP", 
     "USH18", 
     "GOV18", 
@@ -161,6 +163,7 @@ election_columns=[
     ["AG18D", "AG18R"], 
     ["SOS18D", "SOS18R"], 
     ["TRE18D", "TRE18R"], 
+
     ["REG18D", "REG18R"]
     ]
 
@@ -183,9 +186,11 @@ plan_2012 = Partition(graph_mggg,
 
 plan_2012_stats = uf.export_election_metrics_per_partition(plan_2012)
 
+
 #Tidy df 
 plan_2012_stats.iloc[0, 1] = float('NaN') 
 plan_2012_stats.iloc[0, 2] = float('NaN') 
+
 plan_2012_stats = plan_2012_stats.rename({'wins':'dem_wins'}, axis=1)
 
 plan_2012_names = plan_2012_stats.index.values
@@ -224,7 +229,6 @@ for n in range(50):
     seeds_county.append(partition_seed["count_splits"])
     seeds_comp.append(sum([.45<x<.55 for x in partition_seed['USH18'].percents('First')]))
   
-    
 plt.hist(seeds_county)
 plt.hist(seeds_comp)
 
@@ -266,12 +270,14 @@ PROCESS:
 
 DECISION:
     
+
 No comparison between answers between the two
 State vs. Republican
 
 """
 
 def competitive_county_accept(partition):
+
     new_score = 0 
     old_score = 0 
     for i in range(7):
@@ -281,10 +287,12 @@ def competitive_county_accept(partition):
         if .45 < partition['USH18'].percents("First")[i] <.55:
             new_score += 1
             
+
     if (new_score >= old_score) & (partition["count_splits"] < partition.parent["count_splits"]):
         return True
     elif (new_score >= old_score)  & (random.random() < .05):
         return True
+
     elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05): 
         return True
     else:
@@ -295,6 +303,18 @@ def squeeze_accept(partition):
     """
     Write a function that 
     - Sort districts by most Democratic heavy and most Republican heavy 
+
+    elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05):
+        return True
+    else:
+        return False
+
+def squeeze_accept(partition):
+
+    """
+    Write a function that
+    - Sort districts by most Democratic heavy and most Republican heavy
+
     - Assign a base value of competitiveness for each district
     - Run chain, accept only if districts satisfy values under or order
     """
@@ -314,4 +334,3 @@ compactness_bound = constraints.UpperBound(
 )
 
 
-#--- 
