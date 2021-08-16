@@ -63,7 +63,10 @@ except OSError:
 graph_mggg = Graph.from_json("Data/co_precincts.json")
 df_mggg = gpd.read_file("Data/co_precincts.shp")
 
-uf.plot_district_map(df_mggg, df_mggg['CD116FP'].to_dict(), "Current Congressional District Map")
+uf.plot_district_map(df_mggg, 
+                     df_mggg['CD116FP'].to_dict(), 
+                     title="Current Congressional District Map",
+                     map_colors="Set2")
 
 nx.draw(graph_mggg,pos = {node:(graph_mggg.nodes[node]["C_X"],graph_mggg.nodes[node]["C_Y"]) 
                      for node in graph_mggg.nodes()},node_color=[graph_mggg.nodes[node]["CD116FP"] 
@@ -113,7 +116,7 @@ CONTEXT: Need to decide the appropriate starting plan to begin the ensemble
 One option is the 2012 enacted plan -- however it has been claimed to be a Democrat
 gerrymandered map by Republicans. 
 
-Another option is to generate a collection of neutral seed plans made up of 8 districts
+Another option is to generate a collection of neutral seed plans made up of 7 districts
 organized by Democratic share of votes to indicate competitiveness
 
 PROCESS: I generated 10 seed plans and built a dataframe of their Democrat vote totals
@@ -178,11 +181,27 @@ plan_2012 = Partition(graph_mggg,
                       df_mggg["CD116FP"],
                       updater)
 
+plan_2012_stats = uf.export_election_metrics_per_partition(plan_2012)
+
+#Tidy df 
+plan_2012_stats.iloc[0, 1] = float('NaN') 
+plan_2012_stats.iloc[0, 2] = float('NaN') 
+plan_2012_stats = plan_2012_stats.rename({'wins':'dem_wins'}, axis=1)
+
+plan_2012_names = plan_2012_stats.index.values
+plan_2012_comp=[]
+for n in range(7):
+    plan_2012_comp.append(sum([.45<x<.55 for x in plan_2012[plan_2012_names[n]].percents('First')]))
+
+plan_2012_stats['comp_dist'] = np.array(plan_2012_comp)
+plan_2012_stats.iloc[0, 4] = float('NaN') 
+
 seeds_stats = pd.DataFrame(columns=[],
                            index=range(7))
 
 seeds_county=[]
 seeds_comp=[]
+seeds_wasted=[]
 #Running multiple seeds to note comp districts and county splits of starting plans
 for n in range(50):
     plan_seed = recursive_tree_part(graph_mggg, #graph object
@@ -205,6 +224,7 @@ for n in range(50):
     seeds_county.append(partition_seed["count_splits"])
     seeds_comp.append(sum([.45<x<.55 for x in partition_seed['USH18'].percents('First')]))
   
+    
 plt.hist(seeds_county)
 plt.hist(seeds_comp)
 
