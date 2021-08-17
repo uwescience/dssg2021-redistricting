@@ -4,7 +4,10 @@ Colorado/data/RDH/*
 Colorado/Data/RDH/*
 Virginia/Outputs/
 Virginia/.idea/*
-Texas/Data/
+Texas/Data/TX_VTDs/
+Texas/Data/TX_VTDs_POP2019/
+Texas/Data/TX_acs5_2019_bg/
+Texas/Outputs/
 Texas/.ipynb_checkpoints
 .idea/*
 
