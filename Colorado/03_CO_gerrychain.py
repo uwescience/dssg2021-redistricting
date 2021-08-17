@@ -22,6 +22,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+sns.set_theme(style="whitegrid")
+
 from gerrychain import (
     Election,
     Graph,
@@ -39,8 +41,6 @@ from gerrychain.tree import recursive_tree_part, bipartition_tree_random, Popula
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
 import utility_functions as uf
-
-#plt.style.use('seaborn-whitegrid')
 
 #--- IMPORT DATA
 
@@ -137,7 +137,6 @@ sum(i < 0.55 for i in stats_2012_df["percent"][1]) #number of "competitive" dist
 print(partition_2012["count_splits"]) #7 county splits in the 2012 map
 
 #--- STARTING PLAN (SEED PLAN)
-
 
 plan_seed = recursive_tree_part(graph, #graph object
                                 range(num_districts), #How many districts
@@ -246,7 +245,6 @@ compactness_bound = constraints.UpperBound(
     lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
 )
 
-
 #--- ACCEPTANCE FUNCTIONS
 
 def competitive_county_accept(partition):
@@ -259,15 +257,36 @@ def competitive_county_accept(partition):
         if .45 < partition['USH18'].percents("First")[i] <.55:
             new_score += 1
             
-    if (new_score >= old_score) & (partition["count_splits"] < partition.parent["count_splits"]):
+    if (new_score >= old_score) and (partition["count_splits"] < partition.parent["count_splits"]):
         return True
-    elif (new_score >= old_score)  & (random.random() < .05):
+    elif (new_score >= old_score)  and (random.random() < .05):
         return True
     elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05): 
         return True
     else:
         return False
 
+def competitive_squeeze_accept(partition): 
+    
+    if ((min(partition["USH18"].percents("First"))) > (min(partition.parent["USH18"].percents("First")))) \
+        or ((max(partition["USH18"].percents("First"))) < (max(partition.parent["USH18"].percents("First")))): 
+        return True
+    elif random.random() < .15:
+        return True
+    else:
+        return False
+"""
+def squeeze_accept(partition): 
+    min_diff = min(partition.parent["USH18"].percents("First")) - min(partition["USH18"].percents("First"))
+    max_diff = max(partition.parent["USH18"].percents("First")) - max(partition["USH18"].percents("First"))
+    
+    if (min_diff < 0) or (max_diff > 0):
+        return True
+    elif random.random() < .10:
+        return True
+    else:
+        return False
+"""
 #--- MCMC CHAINS
 
 chain = MarkovChain(
@@ -276,9 +295,10 @@ chain = MarkovChain(
         constraints.within_percent_of_ideal_population(partition_seed, 0.01),
         compactness_bound
     ],
-    accept=competitive_county_accept, 
+    #accept=accept.always_accept,  
+    accept=competitive_squeeze_accept,
     initial_state=partition_seed,
-    total_steps=30
+    total_steps=10
 )
 
 #--- RUN CHAINS
@@ -286,6 +306,7 @@ chain = MarkovChain(
 dem_seats = []
 comps = []
 splits = []
+squeeze=[]
 
 chain_loop = pd.DataFrame(columns=[],
                          index=df.index)
@@ -300,7 +321,14 @@ for part in chain:
 
     dem_seats.append(part['USH18'].wins('First'))
     comps.append(sum([.45<x<.55 for x in part['USH18'].percents('First')]))
-    print(num_splits(part))
+    squeeze.append([(min(part["USH18"].percents("First"))),
+                    (max(part["USH18"].percents("First")))]
+        )
+    #print(num_splits(part))
+    print(([(min(part["USH18"].percents("First"))),
+                    (max(part["USH18"].percents("First")))]
+        ))
+    print("----")
     n+=1
 
 plt.hist(comps)
