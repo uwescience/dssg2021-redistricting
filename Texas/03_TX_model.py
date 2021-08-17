@@ -67,10 +67,10 @@ from ast import literal_eval
 #user input parameters######################################
 total_steps = 10000
 pop_tol = .01 #U.S. Congress (deviation from ideal district population)
-run_name = 'Texas_2019_run_county_aware_proposal_inclusion'
+run_name = 'Texas_2019_run_county_aware_proposal'
 start_map = 'Seed_Demo_' #CD, 'Seed_Demo', or "new_seed"
 effectiveness_cutoff = .6
-ensemble_inclusion = True
+ensemble_inclusion = False
 ensemble_inclusion_demo = False
 record_statewide_modes = True
 record_district_mode = False
