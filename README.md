@@ -9,17 +9,17 @@ Broadly, this project has two core aims: to understand how computational tools c
 
 We conducted three different use cases of GerryChain across three different state contexts to demonstrate the process of computational redistricting. The purpose of this exercise is to illustrate the decision process associated with different types of analysis across differing state contexts. These case studies complement the guide’s outline of GerryChain steps from start to finish, following the application of each stage alongside example code found in the relevant state directory.
 
-* Georgia: Using GerryChain’s Built in Metrics
+* **Georgia:** Using GerryChain’s Built in Metrics
   
   Focus: Partisan Metrics
 
-* Colorado: Using GerryChain to Support the Map Drawing Process
+* **Colorado:** Using GerryChain to Support the Map Drawing Process
 
-Focus: Political Competitiveness
+  Focus: Political Competitiveness
 
-* Texas: Using GerryChain to Evaluate Proposed or Enacted Maps
+* **Texas:** Using GerryChain to Evaluate Proposed or Enacted Maps
  
-Focus: Voting Rights Act and Opportunity Districts
+  Focus: Voting Rights Act and Opportunity Districts
 
 
 
