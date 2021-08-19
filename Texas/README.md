@@ -4,7 +4,7 @@ The results from this analysis are summarized on our project website: https://uw
 
 This analysis expands upon work done by the MGGG Redistricting Lab, and relies heavily on the modeling code and input data sources outlined [here](https://github.com/mggg/VRA_ensembles).
 
-03_TX_model.py is the main model file (adapted from the Texas modeling [file](https://github.com/mggg/VRA_ensembles/blob/master/TX/TX_elections_model.py) provided by MGGG) and the run_functions file has supporting functions. 
+`03_TX_model.py` is the main model file (adapted from the Texas modeling [file](https://github.com/mggg/VRA_ensembles/blob/master/TX/TX_elections_model.py) provided by MGGG) and the run_functions file has supporting functions. 
 
 To get started, download all Data & Input files outlined on the MGGG VRA ensembles 
 github into the same local TX/ directory with the following exception:
