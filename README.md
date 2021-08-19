@@ -19,7 +19,7 @@ We conducted three different use cases of GerryChain across three different stat
 
 * **Texas:** Using GerryChain to Evaluate Proposed or Enacted Maps
  
-  Focus: Voting Rights Act and Opportunity Districts
+  Focus: Voting Rights Act and Minority Effective Districts
 
 
 
