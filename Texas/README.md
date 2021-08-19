@@ -7,7 +7,7 @@ This analysis expands upon work done by the MGGG Redistricting Lab, and relies h
 `03_TX_model.py` is the main model file (adapted from the Texas modeling [file](https://github.com/mggg/VRA_ensembles/blob/master/TX/TX_elections_model.py) provided by MGGG) and the run_functions file has supporting functions. 
 
 To get started, download all Data & Input files outlined on the MGGG VRA ensembles 
-github into the same local Texas/ directory with the following exception:
+[github](https://github.com/mggg/VRA_ensembles) into the same local Texas/ directory with the following exception:
 
 **Instead of using the MGGG provided shapefile, unzip the 'TX_VTDs_POP2019.zip' directory and use the related shapefiles.** This shapefile has been created by augmenting the orginal MGGG Texas shapefile with additional ACS 2019 population data for the ensemble analysis comparing plans from 2010 to plans from 2020. The data wrangling steps to combine the two data sources are outlined in `01_TX_data_wrangling.py`.
 
