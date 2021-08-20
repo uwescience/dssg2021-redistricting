@@ -14,5 +14,5 @@ A robust neutral ensemble means a statistically significant collection of distri
 (B) adherence to established one person-one vote requirements; and
 (C) a compactness requirement justified by comparison to historically enacted plans in the state."
 
-The `VA_MeanSeatTest.ipynb` notebook explores the translation of this legislative text into a quantifable method. The `VA_Case_Study.py` explores some general partisan metrics that could be used as an alternative to the proposed mean seats test.
+The `VA_MeanSeatTest.ipynb` notebook explores the translation of this legislative text into a quantifable method to assess the efficacy of this test. The `VA_Case_Study.py` explores some general partisan metrics that could be used as an alternative to the proposed mean seats test.
 
