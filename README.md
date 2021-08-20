@@ -20,6 +20,8 @@ We conducted three different use cases of GerryChain across three different stat
 * **Texas:** Using GerryChain to Evaluate Proposed or Enacted Maps
  
   Focus: Voting Rights Act and Minority Effective Districts
+  
+Additionally, we used **Virginia** as an exploratory exercise to help shape the structure of our state level case studies. The primary focus of this exploration was to translate a possible partisan legislative test to a quantifiable method. 
 
 
 
