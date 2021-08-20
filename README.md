@@ -27,6 +27,6 @@ Additionally, we used **Virginia** as an exploratory exercise to help shape the 
 
 # Reproducibility
 
-To reproduce case study results and to follow along with our [User's Guide](https://uwescience.github.io/DSSG2021-redistricting-website/gerrychain/), please ensure the following steps are taken first:
+To reproduce case study results and to follow along with our [User's Guide](https://uwescience.github.io/DSSG2021-redistricting-website/guide/), please ensure the following steps are taken first:
 
 * Set REDISTRICTING_HOME environment variable to base location of project using `export REDISTRICTING_HOME=[your_path]`.
