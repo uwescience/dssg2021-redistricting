@@ -1,3 +1,7 @@
+## Virginia 
+
+#### Legislative Proposals for Partisan Tests
+
 Virginia has a new bipartisan commission for the upcoming cycle and the state has a long history of racial and partisan gerrymandering. A potential test that state legislatures might consider to assess partisan gerrymandering is:
 
 "No state shall draw the districts for a state legislative body thereof so as to unduly favor a political party such that the political party is able to consistently maintain majority control of the body with a minority of the popular vote or maintain supermajority control of the body, as defined by the laws of the state and procedures of the body, with a bare majority of the popular vote. 
