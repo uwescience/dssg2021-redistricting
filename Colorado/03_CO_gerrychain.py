@@ -68,8 +68,13 @@ newdir = "./Outputs/"+state_abbr+housen+"_Precincts/"
 print(newdir)
 os.makedirs(os.path.dirname(newdir), exist_ok=True)
 
-uf.plot_district_map(df, df['CD116FP'].to_dict(), "2012 Colorado Congressional District Map")
-uf.plot_district_map(df, df['COUNTYFP'].to_dict(), "Colorado County Map")
+uf.plot_district_map(df, 
+                     df['CD116FP'].to_dict(), 
+                     title="2012 Colorado Congressional District Map",
+                     map_colors="tab20")
+uf.plot_district_map(df, df['COUNTYFP'].to_dict(), 
+                     title="Colorado County Map",
+                     map_colors="tab20")
 
 #--- DATA CLEANING
 
@@ -159,7 +164,8 @@ stats_seed_df = uf.export_election_metrics_per_partition(partition_2012)
 
 uf.plot_district_map(df, 
                      plan_seed, 
-                     "Random Seed Plan Map") 
+                     title="Random Seed Plan Map",
+                     map_colors="Set1") 
 
 # --- PROPOSAL
 
@@ -275,18 +281,24 @@ def competitive_squeeze_accept(partition):
         return True
     else:
         return False
-"""
-def squeeze_accept(partition): 
-    min_diff = min(partition.parent["USH18"].percents("First")) - min(partition["USH18"].percents("First"))
-    max_diff = max(partition.parent["USH18"].percents("First")) - max(partition["USH18"].percents("First"))
-    
-    if (min_diff < 0) or (max_diff > 0):
-        return True
-    elif random.random() < .10:
-        return True
-    else:
-        return False
-"""
+
+part_dist_sort = sorted(partition_seed["USH18"].percents("First"))
+
+partition_seed["USH18"].percents("First")
+
+new_score = 0 
+old_score = 0 
+for i in range(7):
+    if .45 < partition_seed['USH18'].percents("First")[i] <.55:
+        old_score += 1
+
+        
+        
+        
+        
+    if .45 < partition['USH18'].percents("First")[i] <.55:
+        new_score += 1
+
 #--- MCMC CHAINS
 
 chain = MarkovChain(
