@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Colorado Case Study
+Stage 3. Applying GerryChain
 """
 
 import os
@@ -71,10 +71,10 @@ os.makedirs(os.path.dirname(newdir), exist_ok=True)
 uf.plot_district_map(df, 
                      df['CD116FP'].to_dict(), 
                      title="2012 Colorado Congressional District Map",
-                     map_colors="tab20")
+                     map_colors="Dark2")
 uf.plot_district_map(df, df['COUNTYFP'].to_dict(), 
                      title="Colorado County Map",
-                     map_colors="tab20")
+                     map_colors="Set3")
 
 #--- DATA CLEANING
 
@@ -97,7 +97,6 @@ def num_splits(partition, df=df):
 updater = {
     "population": updaters.Tally("TOTPOP", alias="population"), 
     "cut_edges": cut_edges,
-    "PP":polsby_popper,
     "count_splits": num_splits
             }
 
@@ -132,40 +131,19 @@ partition_2012 = Partition(graph,
                            df["CD116FP"],
                            updater)
 
-stats_2012_df = uf.export_election_metrics_per_partition(partition_2012)
+plan_2012_stats = uf.export_election_metrics_per_partition(partition_2012)
 
-stats_2012_df.loc[:, "cut_edges_value"] = len(partition_2012["cut_edges"])
-stats_2012_df.loc[:, "ideal_population"] = sum(partition_2012["population"].values()) / len(partition_2012)
-stats_2012_df.loc[:, "county_splits"] = partition_2012["count_splits"]
+plan_2012_stats = plan_2012_stats.drop(labels="POC_VAP", axis=0)
+plan_2012_stats = plan_2012_stats.rename({'wins':'dem_wins'}, axis=1)
 
-sum(i < 0.55 for i in stats_2012_df["percent"][1]) #number of "competitive" districts
-print(partition_2012["count_splits"]) #7 county splits in the 2012 map
+plan_2012_names = plan_2012_stats.index.values
+plan_2012_comp=[]
+for n in range(1):
+    plan_2012_comp.append(sum([.45<x<.55 for x in partition_2012[plan_2012_names[n]].percents('First')]))
 
-#--- STARTING PLAN (SEED PLAN)
+plan_2012_stats['comp_dist'] = np.array(plan_2012_comp)
 
-plan_seed = recursive_tree_part(graph, #graph object
-                                range(num_districts), #How many districts
-                                totpop/num_districts, #population target
-                                "TOTPOP", #population column, variable name
-                                .01, #epsilon value
-                                1)
-
-# --- PARTITION (SEED PLAN)
-
-partition_seed = Partition(graph,
-                           plan_seed, 
-                           updater)
-
-partition_seed["count_splits"]
-
-#--- STATS (SEED PLAN)
-
-stats_seed_df = uf.export_election_metrics_per_partition(partition_2012)
-
-uf.plot_district_map(df, 
-                     plan_seed, 
-                     title="Random Seed Plan Map",
-                     map_colors="Set1") 
+print(partition_2012["count_splits"])
 
 # --- PROPOSAL
 
@@ -226,13 +204,12 @@ def my_uu_bipartition_tree_random(graph, pop_col, pop_target, epsilon, node_repe
                 graph.edges[edge]["weight"] = county_weight * random.random()
             else:
                 graph.edges[edge]["weight"] = random.random()
-#         spanning_tree = tree.random_spanning_tree(graph)
         spanning_tree = get_spanning_tree_u_w(graph)
         h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon)
         possible_cuts = find_balanced_edge_cuts_memoization(h, choice=choice)
     return choice(possible_cuts).subset
 
-ideal_population = sum(partition_seed["population"].values()) / len(partition_seed)
+ideal_population = sum(partition_2012["population"].values()) / len(partition_2012)
 
 proposal = partial(
     recom,
@@ -245,105 +222,82 @@ proposal = partial(
 
 #--- CREATE CONSTRAINTS
 
-popbound = constraints.within_percent_of_ideal_population(partition_seed, 0.01)
+popbound = constraints.within_percent_of_ideal_population(partition_2012, 0.01)
 
 compactness_bound = constraints.UpperBound(
-    lambda p: len(p["cut_edges"]), 1.5 * len(partition_seed["cut_edges"])
+    lambda p: len(p["cut_edges"]), 1.5 * len(partition_2012["cut_edges"])
 )
 
 #--- ACCEPTANCE FUNCTIONS
 
-def competitive_county_accept(partition):
-    new_score = 0 
-    old_score = 0 
+def competitive_nudge_county_accept(partition):
+    nudge_old = 0 
+    nudge_new = 0 
+    
+    for i in range(7):
+        if .40 < partition.parent['USH18'].percents("First")[i] <.60:
+            nudge_old += 1
+            
+        if .40 < partition['USH18'].percents("First")[i] <.60:
+            nudge_new += 1
+    
+    band_old = 0 
+    band_new = 0 
     for i in range(7):
         if .45 < partition.parent['USH18'].percents("First")[i] <.55:
-            old_score += 1
+            band_old += 1
             
         if .45 < partition['USH18'].percents("First")[i] <.55:
-            new_score += 1
+            band_new += 1
             
-    if (new_score >= old_score) and (partition["count_splits"] < partition.parent["count_splits"]):
+    if (nudge_new >= nudge_old) and (band_new >= band_old) \
+    and (partition["count_splits"] < partition.parent["count_splits"]):
         return True
-    elif (new_score >= old_score)  and (random.random() < .05):
-        return True
-    elif (partition["count_splits"] < partition.parent["count_splits"]) & (random.random() < .05): 
-        return True
-    else:
-        return False
-
-def competitive_squeeze_accept(partition): 
     
-    if ((min(partition["USH18"].percents("First"))) > (min(partition.parent["USH18"].percents("First")))) \
-        or ((max(partition["USH18"].percents("First"))) < (max(partition.parent["USH18"].percents("First")))): 
+    elif (band_new >= band_old) \
+    and (partition["count_splits"] < partition.parent["count_splits"]):
         return True
-    elif random.random() < .15:
+    
+    elif (nudge_new >= nudge_old) and (band_new >= band_old) \
+    and (random.random() < .10):
         return True
+        
+    elif (random.random() < .10) \
+    and (partition["count_splits"] < partition.parent["count_splits"]):
+        return True
+    
     else:
         return False
-
-part_dist_sort = sorted(partition_seed["USH18"].percents("First"))
-
-partition_seed["USH18"].percents("First")
-
-new_score = 0 
-old_score = 0 
-for i in range(7):
-    if .45 < partition_seed['USH18'].percents("First")[i] <.55:
-        old_score += 1
-
-        
-        
-        
-        
-    if .45 < partition['USH18'].percents("First")[i] <.55:
-        new_score += 1
-
+    
 #--- MCMC CHAINS
 
 chain = MarkovChain(
     proposal=proposal,
     constraints=[
-        constraints.within_percent_of_ideal_population(partition_seed, 0.01),
+        popbound,
         compactness_bound
     ],
-    #accept=accept.always_accept,  
-    accept=competitive_squeeze_accept,
-    initial_state=partition_seed,
-    total_steps=10
+    accept=competitive_nudge_county_accept,
+    initial_state=partition_2012,
+    total_steps=20000
 )
 
 #--- RUN CHAINS
 
-dem_seats = []
 comps = []
 splits = []
-squeeze=[]
+t=0
 
-chain_loop = pd.DataFrame(columns=[],
-                         index=df.index)
-n=0
-for part in chain: 
-    df['current'] = df.index.map(dict(part.assignment))
-    df.plot(column='current',cmap='tab20')
-    plt.axis('off')
-    
-    chain_loop['current'] = df['current']
-    chain_loop=chain_loop.rename(columns={'current': 'step_' + str(n)})    
-
-    dem_seats.append(part['USH18'].wins('First'))
+for part in chain:
+    splits.append(part["count_splits"])
     comps.append(sum([.45<x<.55 for x in part['USH18'].percents('First')]))
-    squeeze.append([(min(part["USH18"].percents("First"))),
-                    (max(part["USH18"].percents("First")))]
-        )
-    #print(num_splits(part))
-    print(([(min(part["USH18"].percents("First"))),
-                    (max(part["USH18"].percents("First")))]
-        ))
-    print("----")
-    n+=1
-
-plt.hist(comps)
-plt.hist(dem_seats)
+    t += 1
+    if t % 200 == 0:
+        print(t)
+    if t%20000==0:
+        t=0
 
 #--- BUILD VISUALIZATIONS
+
+plt.hist(comps)
+plt.hist(splits)
