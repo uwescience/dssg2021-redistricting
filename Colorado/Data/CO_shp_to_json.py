@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Preprocessing CO to convert shapefile to json 
+Colorado Case Study: Converting shapefile to json 
 """
 
 import os
