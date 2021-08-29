@@ -6,8 +6,8 @@ Description: This file pulls Presidential, U.S. Senate, and U.S. House elections
 from Colorado's Secretary of State Office and merges it into panel data files to use for analysis. 
 
 Output: 
-    co_elections_2012_2020.csv
-    co_elections_2004_2010.csv
+    data/co_elections_2012_2020.csv
+    data/co_elections_2004_2010.csv
 
 """
 
