@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Stage 3. Applying GerryChain
+03. Applying GerryChain
+
+Description: This script applies the modeling decisions established in 02_CO_EDA_Modeling_Decisions.ipynb,
+and generates two histograms that display the results from our ensemble. 
+
+Output: 
+    Outputs/co_recom_county.json
+    Outputs/co_recom_comp.json
+
 """
 
 import os
@@ -41,6 +49,8 @@ from gerrychain.tree import recursive_tree_part, bipartition_tree_random, Popula
 
 sys.path.insert(0, os.getenv("REDISTRICTING_HOME"))
 import utility_functions as uf
+
+sns.set(style="white", palette="muted", color_codes=True)
 
 #--- IMPORT DATA
 
@@ -297,7 +307,41 @@ for part in chain:
     if t%20000==0:
         t=0
 
+with open("Outputs/co_comps_20000.json", 'w') as f:
+    json.dump(comps, f) 
+    
+with open("Outputs/co_splits_20000.json", 'w') as f:
+    json.dump(splits, f) 
+
+"""
+with open("Outputs/co_comps_20000.json", 'r') as f:
+    comps = json.load(f)
+
+with open("Outputs/co_splits_20000.json", 'r') as f:
+    splits = json.load(f)
+"""
+
 #--- BUILD VISUALIZATIONS
 
-plt.hist(comps)
-plt.hist(splits)
+plt.hist(comps, bins=5, color="cadetblue")
+plt.axvline(x=sum(comps)/len(comps), color="black", label="Ensemble Mean")
+plt.axvline(x=1, color="orangered", label="2012 Enacted Plan")
+plt.legend(loc="upper left")
+plt.locator_params(axis="both", integer=True, tight=True)
+plt.xlabel("Number of Competitive Districts")
+plt.ylabel("Count of Plans in Ensemble")
+sns.despine(left=True, right=True)
+plt.savefig('Outputs/co_recom_comps.png', dpi=300)
+plt.show()
+
+plt.hist(splits, bins=20, color="lightsteelblue")
+plt.axvline(x=sum(splits)/len(splits), color="black", label="Ensemble Mean")
+plt.axvline(x=7, color="orangered", label="2012 Enacted Plan")
+plt.legend(loc="upper right")
+plt.locator_params(axis="both", integer=True, tight=True)
+plt.xlabel("Number of County Splits")
+plt.ylabel("Count of Plans in Ensemble")
+sns.despine(left=True, right=True)
+plt.savefig('Outputs/co_recom_splits.png', dpi=300)
+plt.show()
+
